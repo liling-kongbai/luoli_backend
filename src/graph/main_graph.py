@@ -5,7 +5,7 @@ from .node import intuition_chat_node
 from .type import IntentClassification
 
 
-async def create_main_graph_builder():
+async def create_main_graph_builder() -> StateGraph:
     """创建主图构建器"""
 
     builder = StateGraph()
