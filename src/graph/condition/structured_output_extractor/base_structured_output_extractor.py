@@ -39,6 +39,7 @@ class BaseStructuredOutputExtractor(ABC):
             logger.warning(
                 f'<BaseStructuredOutputExtractor> 初始化 LLM 结构化输出功能报错！！！\n{format_exc()}'
             )
+            raise
 
     def _get_partial_variables(self) -> dict[str, Any]:
         """获取部分变量，获取系统提示词中部分变量的值"""
@@ -51,7 +52,7 @@ class BaseStructuredOutputExtractor(ABC):
         chat_prompt = ChatPromptTemplate.from_messages(
             [
                 ('system', dedent(self.SYSTEM_PROMPT)),
-                ('human', '{input}'),
+                ('human', '以下是部分对话历史和用户最新的一条信息：\n{input}'),
             ]
         )
         if partial_variables := self._get_partial_variables():
