@@ -1,6 +1,6 @@
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnableConfig
+from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.config import RunnableConfig
 
 
 async def chat_node(state, config: RunnableConfig, llm: BaseChatModel) -> dict:
@@ -20,4 +20,4 @@ async def chat_node(state, config: RunnableConfig, llm: BaseChatModel) -> dict:
         },
         config,
     )
-    return {'messages': response}
+    return {'messages': [response]}
