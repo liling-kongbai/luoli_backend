@@ -1,1 +1,1 @@
-from .common_node import chat_node
+from .intuition_node import intuition_chat_node
