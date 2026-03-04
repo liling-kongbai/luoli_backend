@@ -21,9 +21,9 @@ async def create_main_graph_builder(llm: BaseChatModel):
         START,
         partial(intent_classifier_condition, llm=llm),
         {
-            IntentClassification.IntuitionLayer: 'chat_node',
-            IntentClassification.RoutineLayer: 'chat_node',
-            IntentClassification.InferenceLayer: 'chat_node',
+            IntentClassification.IntuitionLayer.value: 'chat_node',
+            IntentClassification.RoutineLayer.value: 'chat_node',
+            IntentClassification.InferenceLayer.value: 'chat_node',
         },
     )
 
