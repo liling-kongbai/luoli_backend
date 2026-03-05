@@ -5,9 +5,9 @@ from traceback import format_exc
 from typing import Any, Type
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableSequence
-from pydantic import BaseModel
+from langchain_core.prompts.chat import ChatPromptTemplate
+from langchain_core.runnables.base import RunnableSequence
+from pydantic.main import BaseModel
 
 logger = getLogger(__name__)
 
