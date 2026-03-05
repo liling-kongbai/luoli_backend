@@ -1,1 +1,2 @@
 from .intent_classifier import IntentClassifier
+from .introspect_classifier import IntrospectClassifier
