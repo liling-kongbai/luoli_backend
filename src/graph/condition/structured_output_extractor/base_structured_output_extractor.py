@@ -51,7 +51,7 @@ class BaseStructuredOutputExtractor(ABC):
         chat_prompt = ChatPromptTemplate.from_messages(
             [
                 ('system', dedent(self.SYSTEM_PROMPT)),
-                ('human', '以下是部分对话历史和用户最新的一条信息：\n{input}'),
+                ('human', '以下是部分对话历史或用户最新的一条信息：\n{input}'),
             ]
         )
         if partial_variables := self._get_partial_variables():
