@@ -14,8 +14,9 @@ async def routine_graph_adapter_node(
 
     routine_state = {
         'messages': state.messages,
+        'user_input_content': state.messages[-1].content,
         'introspect_count': 0,
-        'response_draft': None,
+        'response_draft_content': None,
     }
 
     try:
