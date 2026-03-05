@@ -37,9 +37,8 @@ class BaseStructuredOutputExtractor(ABC):
         except Exception:
             self._llm_with_structured_output = llm
             logger.warning(
-                f'<BaseStructuredOutputExtractor> 初始化 LLM 结构化输出功能报错！！！\n{format_exc()}'
+                f'<BaseStructuredOutputExtractor> 初始化 LLM 结构化输出报错！！！\n{format_exc()}'
             )
-            raise
 
     def _get_partial_variables(self) -> dict[str, Any]:
         """获取部分变量，获取系统提示词中部分变量的值"""
