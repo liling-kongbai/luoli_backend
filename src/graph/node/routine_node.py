@@ -1,10 +1,25 @@
-from logging import getLogger
-
 from langchain_core.runnables.config import RunnableConfig
 
-from ..prompt import ROUTINE_FINAL_CHAT_SYSTEM_PROMPT_TEMPLATE
+from ..prompt import (
+    ROUTINE_CHAT_SYSTEM_PROMPT_TEMPLATE,
+    ROUTINE_FINAL_CHAT_SYSTEM_PROMPT_TEMPLATE,
+)
 
-logger = getLogger(__name__)
+
+async def routine_chat_node(state, config: RunnableConfig) -> dict:
+    """常规层对话节点"""
+
+    llm = config['configurable'].get('llm')
+
+    chain = ROUTINE_CHAT_SYSTEM_PROMPT_TEMPLATE | llm
+    response = await chain.ainvoke(
+        {
+            'user_name': config['configurable'].get('user_name', '用户'),
+            'messages': state.messages,
+        },
+        config,
+    )
+    return {'messages': [response]}
 
 
 async def routine_final_chat_node(state, config: RunnableConfig) -> dict:
