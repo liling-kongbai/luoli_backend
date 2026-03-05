@@ -1,1 +1,6 @@
-from .main_graph_type import Intent, IntentClassification
+from .type import (
+    Intent,
+    IntentClassification,
+    Introspection,
+    IntrospectionClassification,
+)
