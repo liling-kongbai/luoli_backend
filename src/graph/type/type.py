@@ -16,3 +16,17 @@ class Intent(BaseModel):
     """数据模型，意图"""
 
     intent: IntentClassification
+
+
+# 反思相关
+class IntrospectionClassification(str, Enum):
+    """枚举，反思类别"""
+
+    IntrospectLayer = 'introspect_layer'  # 反思层
+    FinalResponseLayer = 'final_response_layer'  # 最终响应层
+
+
+class Introspection(BaseModel):
+    """数据模型，反思"""
+
+    introspection: IntrospectionClassification
