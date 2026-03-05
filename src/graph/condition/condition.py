@@ -43,6 +43,10 @@ async def introspect_classifier_condition(state, config: RunnableConfig) -> str:
         raise ValueError('<introspect_classifier_condition> 当前无 LLM，请检查！！！')
 
     if state.introspect_count >= 3:
+        logger.warning(
+            '<introspect_classifier_condition> 反思次数超过 3 次，直接返回最终响应层！！！'
+        )
+        state.introspect_count = 0
         return IntrospectionClassification.FinalResponseLayer.value
 
     try:
