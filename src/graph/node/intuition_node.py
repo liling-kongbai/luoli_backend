@@ -1,8 +1,9 @@
 from logging import getLogger
 
 from langchain_core.messages.ai import AIMessage
-from langchain_core.prompts.chat import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.config import RunnableConfig
+
+from ..prompt import INTUITION_CHAT_SYSTEM_PROMPT_TEMPLATE
 
 logger = getLogger(__name__)
 
@@ -19,16 +20,10 @@ async def intuition_chat_node(state, config: RunnableConfig) -> dict:
             ]
         }
 
-    chat_prompt_template = ChatPromptTemplate.from_messages(
-        [
-            ('system', '{system_prompt}'),
-            MessagesPlaceholder(variable_name='messages'),
-        ]
-    )
-    chain = chat_prompt_template | llm
+    chain = INTUITION_CHAT_SYSTEM_PROMPT_TEMPLATE | llm
     response = await chain.ainvoke(
         {
-            'system_prompt': state.system_prompt,
+            'user_name': config['configurable'].get('user_name', '用户'),
             'messages': state.messages,
         },
         config,
