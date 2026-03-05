@@ -24,7 +24,9 @@ class GraphManager:
         """编译图"""
 
         if self._graph:
-            logger.warning('<compile_graph> 图已存在，请勿重复编译！！！')
+            logger.warning(
+                '<compile_graph> 图已存在，请勿重复编译，请检查代码逻辑！！！'
+            )
             return
 
         try:
