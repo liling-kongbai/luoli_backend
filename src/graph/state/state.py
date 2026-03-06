@@ -11,6 +11,8 @@ class MainGraphState(BaseModel):
 
     messages: Annotated[list[BaseMessage], add_messages]
 
+    intent: str | None = Field(default=None)
+
 
 class RoutineGraphState(BaseModel):
     """常规层图状态"""
