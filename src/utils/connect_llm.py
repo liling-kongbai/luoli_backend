@@ -1,8 +1,8 @@
 from os import getenv
 
-from langchain_deepseek import ChatDeepSeek
-from langchain_ollama import ChatOllama
-from pydantic import SecretStr
+from langchain_deepseek.chat_models import ChatDeepSeek
+from langchain_ollama.chat_models import ChatOllama
+from pydantic.types import SecretStr
 
 
 def connect_ollama_llm(
