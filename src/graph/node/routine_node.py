@@ -11,15 +11,24 @@ async def routine_chat_node(state, config: RunnableConfig) -> dict:
 
     llm = config['configurable'].get('llm')
 
+    if introspect_reason := state.introspect_reason:
+        introspect_reason_prompt = f'上一轮结果经过反思评估后，未通过，请针对以下反馈进行改进：{introspect_reason}'
+    else:
+        introspect_reason_prompt = ''
+
     chain = ROUTINE_CHAT_SYSTEM_PROMPT_TEMPLATE | llm
     response = await chain.ainvoke(
         {
-            'user_name': config['configurable'].get('user_name', '用户'),
+            'user_name': config['configurable'].get('user_name', '理灵'),
+            'introspect_reason': introspect_reason_prompt,
             'messages': state.messages,
         },
         config,
     )
-    return {'messages': [response]}
+    return {
+        'messages': [response],
+        'introspect_reason': None,
+    }
 
 
 async def routine_final_chat_node(state, config: RunnableConfig) -> dict:
@@ -32,7 +41,6 @@ async def routine_final_chat_node(state, config: RunnableConfig) -> dict:
         {
             'user_input_content': state.user_input_content,
             'response_draft_content': state.response_draft_content,
-            'input': state.user_input_content,
         },
         config,
     )
