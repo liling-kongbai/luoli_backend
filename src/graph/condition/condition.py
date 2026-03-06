@@ -9,6 +9,7 @@ from .structured_output_extractor import IntentClassifier, IntrospectClassifier
 logger = getLogger(__name__)
 
 
+# 意图相关
 async def intent_classifier_node(state, config: RunnableConfig) -> dict:
     """意图分类器节点"""
 
@@ -31,6 +32,13 @@ async def intent_classifier_node(state, config: RunnableConfig) -> dict:
         return {'intent': IntentClassification.RoutineLayer.value}
 
 
+def intent_classifier_condition(state) -> str:
+    """意图分类器条件"""
+
+    return state.intent
+
+
+# 反思相关
 async def introspect_classifier_node(state, config: RunnableConfig) -> dict:
     """反思分类器节点"""
 
@@ -85,3 +93,9 @@ async def introspect_classifier_node(state, config: RunnableConfig) -> dict:
             'introspection': IntrospectionClassification.FinalResponseLayer.value,
             'introspect_reason': None,
         }
+
+
+def introspect_classifier_condition(state) -> str:
+    """反思分类器条件"""
+
+    return state.introspection
