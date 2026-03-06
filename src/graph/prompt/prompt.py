@@ -40,6 +40,5 @@ ROUTINE_FINAL_CHAT_SYSTEM_PROMPT_TEMPLATE = ChatPromptTemplate.from_messages(
             '3. 必须忠实于草稿中的事实内容。\n'
             '现在，请把上面的草稿作为你回答的依据，开始你对用户的最终响应。',
         ),
-        ('human', '以下是部分对话历史或用户的消息：\n{input}'),
     ]
 )
