@@ -19,3 +19,6 @@ class RoutineGraphState(BaseModel):
     user_input_content: str | None = Field(default=None)  # 用户输入内容
     introspect_count: int = Field(default=0)  # 反思计数
     response_draft_content: str | None = Field(default=None)  # 响应草稿内容
+
+    introspection: str | None = Field(default=None)
+    introspect_reason: str | None = Field(default=None)
