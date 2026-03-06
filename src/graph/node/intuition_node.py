@@ -11,7 +11,7 @@ async def intuition_chat_node(state, config: RunnableConfig) -> dict:
     chain = INTUITION_CHAT_SYSTEM_PROMPT_TEMPLATE | llm
     response = await chain.ainvoke(
         {
-            'user_name': config['configurable'].get('user_name', '用户'),
+            'user_name': config['configurable'].get('user_name', '理灵'),
             'messages': state.messages,
         },
         config,
