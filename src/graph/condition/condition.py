@@ -19,7 +19,7 @@ async def intent_classifier_node(state, config: RunnableConfig) -> dict:
         chain = IntentClassifier(llm).get_extractor_chain()
         result = await chain.ainvoke(
             {
-                'messages': state.messages[-10:-2],
+                'messages': state.messages[-10:],
                 'input': state.messages[-1].content,
             },
             config,
@@ -47,11 +47,7 @@ async def introspect_classifier_node(state, config: RunnableConfig) -> dict:
         logger.warning(
             '<introspect_classifier_node> 反思次数超过 3 次，直接返回最终响应层！！！'
         )
-        return {
-            'introspect_count': 0,
-            'introspection': IntrospectionClassification.FinalResponseLayer.value,
-            'introspect_reason': None,
-        }
+        return {'introspection': IntrospectionClassification.FinalChatLayer.value}
 
     llm = config['configurable'].get('llm')
 
@@ -59,25 +55,20 @@ async def introspect_classifier_node(state, config: RunnableConfig) -> dict:
         chain = IntrospectClassifier(llm).get_extractor_chain()
         result = await chain.ainvoke(
             {
-                'messages': state.messages[-10:-2],
+                'messages': state.messages,
                 'response_draft': state.response_draft.content
                 if state.response_draft
                 else '暂时没有响应草稿',
-                'input': '上一轮响应结果未通过原因：'
-                + (state.introspect_reason or '无'),
+                'input': f'本次用户的消息/问题：{state.user_input_content}',
             },
             config,
         )
 
         if (
             result.introspection.value
-            == IntrospectionClassification.FinalResponseLayer.value
+            == IntrospectionClassification.FinalChatLayer.value
         ):
-            return {
-                'introspect_count': 0,
-                'introspection': result.introspection.value,
-                'introspect_reason': None,
-            }
+            return {'introspection': result.introspection.value}
         else:
             return {
                 'introspect_count': introspect_count + 1,
@@ -88,11 +79,7 @@ async def introspect_classifier_node(state, config: RunnableConfig) -> dict:
         logger.error(
             f'<introspect_classifier_node> 反思分类器节点报错！！！\n{format_exc()}'
         )
-        return {
-            'introspect_count': 0,
-            'introspection': IntrospectionClassification.FinalResponseLayer.value,
-            'introspect_reason': None,
-        }
+        return {'introspection': IntrospectionClassification.FinalChatLayer.value}
 
 
 def introspect_classifier_condition(state) -> str:
