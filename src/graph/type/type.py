@@ -1,6 +1,7 @@
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import Field
+from pydantic.main import BaseModel
 
 
 # 意图相关
@@ -30,3 +31,4 @@ class Introspection(BaseModel):
     """数据模型，反思"""
 
     introspection: IntrospectionClassification
+    reason: str | None = Field(default=None)  # 原因
