@@ -15,16 +15,18 @@ async def routine_graph_adapter_node(
     routine_state = {
         'messages': state.messages,
         'user_input_content': state.messages[-1].content,
-        'introspect_count': 0,
         'response_draft_content': None,
+        'introspect_count': 0,
+        'introspection': None,
+        'introspect_reason': None,
     }
 
     try:
-        routine_response = await routine_graph.ainvoke(routine_state, config)
+        response = await routine_graph.ainvoke(routine_state, config)
     except Exception:
         logger.error(
             f'<routine_graph_adapter_node> 常规层图适配器节点报错！！！\n{format_exc()}'
         )
         raise
 
-    return {'messages': [routine_response['messages'][-1]]}
+    return {'messages': [response['messages'][-1]]}
