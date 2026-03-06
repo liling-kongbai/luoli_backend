@@ -24,7 +24,7 @@ class IntrospectionClassification(str, Enum):
     """枚举，反思类别"""
 
     IntrospectLayer = 'introspect_layer'  # 反思层
-    FinalResponseLayer = 'final_response_layer'  # 最终响应层
+    FinalChatLayer = 'final_chat_layer'  # 最终对话层
 
 
 class Introspection(BaseModel):
