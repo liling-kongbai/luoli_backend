@@ -11,6 +11,7 @@ from .condition import (
     introspect_classifier_node,
 )
 from .node import (
+    inference_graph_adapter_node,
     intuition_chat_node,
     routine_chat_node,
     routine_final_chat_node,
@@ -52,28 +53,37 @@ async def create_routine_graph() -> CompiledStateGraph:
     return routine_graph_builder.compile()
 
 
-async def create_main_graph(routine_graph: CompiledStateGraph) -> CompiledStateGraph:
+async def create_main_graph(
+    routine_graph: CompiledStateGraph, inference_graph: CompiledStateGraph
+) -> CompiledStateGraph:
     """创建主图"""
 
-    builder = StateGraph(MainGraphState)
+    mian_graph_builder = StateGraph(MainGraphState)
 
-    builder.add_node('intent_classifier_node', intent_classifier_node)
-    builder.add_node('intuition_chat_node', intuition_chat_node)
-    builder.add_node(
+    mian_graph_builder.add_node('intent_classifier_node', intent_classifier_node)
+    mian_graph_builder.add_node('intuition_chat_node', intuition_chat_node)
+    mian_graph_builder.add_node(
         'routine_graph_adapter_node',
         partial(routine_graph_adapter_node, routine_graph=routine_graph),
     )
+    mian_graph_builder.add_node(
+        'inference_graph_adapter_node',
+        partial(inference_graph_adapter_node, inference_graph=inference_graph),
+    )
 
-    builder.add_edge(START, 'intent_classifier_node')
-    builder.add_conditional_edges(
+    mian_graph_builder.add_edge(START, 'intent_classifier_node')
+    mian_graph_builder.add_conditional_edges(
         'intent_classifier_node',
         intent_classifier_condition,
         {
             IntentClassification.IntuitionLayer.value: 'intuition_chat_node',
             IntentClassification.RoutineLayer.value: 'routine_graph_adapter_node',
-            IntentClassification.InferenceLayer.value: '',
+            IntentClassification.InferenceLayer.value: 'inference_graph_adapter_node',
         },
     )
-    builder.add_edge('intuition_chat_node', END)
-    builder.add_edge('routine_graph_adapter_node', END)
-    return builder.compile()
+    mian_graph_builder.add_edge('intuition_chat_node', END)
+    mian_graph_builder.add_edge('routine_graph_adapter_node', END)
+    mian_graph_builder.add_edge(
+        'inference_graph_adapter_node', 'routine_graph_adapter_node'
+    )
+    return mian_graph_builder.compile()
