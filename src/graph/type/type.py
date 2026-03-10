@@ -57,7 +57,7 @@ class BackpropagationClassification(str, Enum):
     Finalise = 'finalise'  # 最终
 
 
-class BackPropagation(BaseModel):
+class Backpropagation(BaseModel):
     """数据模型，反向传播"""
 
     backpropagation: BackpropagationClassification
