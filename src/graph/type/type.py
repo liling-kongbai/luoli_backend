@@ -23,8 +23,8 @@ class Intent(BaseModel):
 class IntrospectionClassification(str, Enum):
     """枚举，反思类别"""
 
-    IntrospectLayer = 'introspect_layer'  # 反思层
-    FinalChatLayer = 'final_chat_layer'  # 最终对话层
+    Introspect = 'introspect'  # 反思
+    Finalise = 'finalise'  # 最终
 
 
 class Introspection(BaseModel):
