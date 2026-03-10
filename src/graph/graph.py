@@ -16,7 +16,7 @@ from .node import (
     routine_chat_node,
     routine_final_chat_node,
     routine_graph_adapter_node,
-    tools_node,
+    tool_call_node,
 )
 from .state import MainGraphState, RoutineGraphState
 from .type import IntentClassification, IntrospectionClassification
@@ -28,7 +28,7 @@ async def create_routine_graph() -> CompiledStateGraph:
     routine_graph_builder = StateGraph(RoutineGraphState)
 
     routine_graph_builder.add_node('routine_chat_node', routine_chat_node)
-    routine_graph_builder.add_node('tool_node', tools_node)
+    routine_graph_builder.add_node('tool_call_node', tool_call_node)
     routine_graph_builder.add_node(
         'introspect_classifier_node', introspect_classifier_node
     )
@@ -38,9 +38,9 @@ async def create_routine_graph() -> CompiledStateGraph:
     routine_graph_builder.add_conditional_edges(
         'routine_chat_node',
         tools_condition,
-        {'tools': 'tool_node', '__end__': 'introspect_classifier_node'},
+        {'tools': 'tool_call_node', '__end__': 'introspect_classifier_node'},
     )
-    routine_graph_builder.add_edge('tool_node', 'routine_chat_node')
+    routine_graph_builder.add_edge('tool_call_node', 'routine_chat_node')
     routine_graph_builder.add_conditional_edges(
         'introspect_classifier_node',
         introspect_classifier_condition,
