@@ -81,3 +81,17 @@ def selector_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
     except Exception:
         logger.error(f'<selector_node> 选择器节点报错！！！\n{format_exc()}')
         return {'current_node_id': SelectionClassification.Finalise.value}
+
+
+def get_context_nodes_trajectory(
+    tree_nodes: dict[str, LATSTreeNode], leaf_node_id: str
+) -> list[LATSTreeNode]:
+    """获取上下文节点轨迹"""
+
+    context_nodes_trajectory = []
+    current_node_id = leaf_node_id
+    while current_node_id:
+        current_node = tree_nodes[current_node_id]
+        context_nodes_trajectory.append(current_node)
+        current_node_id = current_node.parent_id
+    return context_nodes_trajectory[::-1]
