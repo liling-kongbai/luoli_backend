@@ -47,3 +47,17 @@ class Selection(BaseModel):
     """数据模型，选择"""
 
     selection: SelectionClassification
+
+
+# 反向传播相关
+class BackpropagationClassification(str, Enum):
+    """枚举，反向传播类别"""
+
+    Select = 'select'  # 选择
+    Finalise = 'finalise'  # 最终
+
+
+class BackPropagation(BaseModel):
+    """数据模型，反向传播"""
+
+    backpropagation: BackpropagationClassification
