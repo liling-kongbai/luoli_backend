@@ -32,3 +32,18 @@ class Introspection(BaseModel):
 
     introspection: IntrospectionClassification
     reason: str | None = Field(default=None)  # 原因
+
+
+# 选择相关
+class SelectionClassification(str, Enum):
+    """枚举，选择类别"""
+
+    Expand = 'expand'  # 展开
+    Summarise = 'summarise'  # 总结
+    Finalise = 'finalise'  # 最终
+
+
+class Selection(BaseModel):
+    """数据模型，选择"""
+
+    selection: SelectionClassification
