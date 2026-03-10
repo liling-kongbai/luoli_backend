@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 
 from pydantic import Field
 from pydantic.main import BaseModel
@@ -61,3 +62,19 @@ class Backpropagation(BaseModel):
     """数据模型，反向传播"""
 
     backpropagation: BackpropagationClassification
+
+
+# LATS 相关
+class ExpandAction(BaseModel):
+    """数据模型，扩展行动"""
+
+    thought: str = Field(
+        ..., description='思考过程（为什么选择使用这个工具和这些参数？意图是什么？）'
+    )
+    tool_name: str | None = Field(
+        default=None, description='工具名称（如果没有合适的工具，请返回 None）'
+    )
+    tool_args: dict[str, Any] | None = Field(
+        default=None,
+        description='调用工具需要的参数（如果没有合适的工具或此工具不需要参数，请返回 None）',
+    )
