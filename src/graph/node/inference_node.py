@@ -2,10 +2,13 @@ from logging import getLogger
 from math import log, sqrt
 from traceback import format_exc
 
+from langchain_core.messages.ai import AIMessage
+from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 
+from ..prompt import EXPANDER_SYSTEM_PROMPT_TEMPLATE
 from ..state import InferenceGraphState
-from ..type import LATSTreeNode, SelectionClassification
+from ..type import ExpandResult, LATSTreeNode, SelectionClassification
 
 logger = getLogger(__name__)
 
@@ -95,3 +98,66 @@ def get_context_nodes_trajectory(
         context_nodes_trajectory.append(current_node)
         current_node_id = current_node.parent_id
     return context_nodes_trajectory[::-1]
+
+
+async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
+    """扩展器节点"""
+
+    current_node_id = state.current_node_id
+    tree_nodes = state.tree_nodes
+    current_node = tree_nodes[current_node_id]
+    current_node_depth = current_node.depth
+    recent_depth = current_node_depth % config['configurable'].get('summarise_depth')
+    if recent_depth == 0:
+        recent_depth = 1
+
+    current_node_context = []
+    if current_node_summary := current_node.summary:
+        current_node_context.append(
+            HumanMessage(f'前情提要（记忆总结）：{current_node_summary}')
+        )
+
+    context_nodes_trajectory = get_context_nodes_trajectory(tree_nodes, current_node_id)
+    recent_context_nodes_trajectory = context_nodes_trajectory[-recent_depth:]
+    for node in recent_context_nodes_trajectory:
+        if node.action:
+            current_node_context.append(
+                AIMessage(
+                    f'内部思考：{node.action.thought}\n需要调用的工具：{node.action.tool_name}\n需要调用的工具的参数：{node.action.tool_args}'
+                )
+            )
+        if node.observation:
+            current_node_context.append(
+                HumanMessage(f'工具运行情况：{node.observation}')
+            )
+
+    llm = config['configurable'].get('llm')
+    try:
+        chain = EXPANDER_SYSTEM_PROMPT_TEMPLATE | llm.with_structured_output(
+            ExpandResult
+        )
+        result = await chain.ainvoke(
+            {
+                'user_input_content': state.user_input_content,
+                'summary': current_node_context,
+                'messages': current_node_context,
+            },
+            config,
+        )
+
+        if not (candidates := result.candidates):
+            updated_node = current_node.model_copy()
+            updated_node.is_completed = True
+            return {
+                'tree_nodes': {current_node_id: updated_node},
+                'llm_call_count': state.llm_call_count + 1,
+                'candidates': [],
+            }
+
+        return {
+            'candidates': candidates,
+            'llm_call_count': state.llm_call_count + 1,
+        }
+    except Exception:
+        logger.error(f'<expander_node> 扩展器节点报错！！！\n{format_exc()}')
+        return {'candidates': []}
