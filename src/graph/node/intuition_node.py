@@ -1,14 +1,13 @@
 from langchain_core.runnables.config import RunnableConfig
 
 from ..prompt import INTUITION_CHAT_SYSTEM_PROMPT_TEMPLATE
+from ..state import MainGraphState
 
 
-async def intuition_chat_node(state, config: RunnableConfig) -> dict:
+async def intuition_chat_node(state: MainGraphState, config: RunnableConfig) -> dict:
     """直觉层对话节点"""
 
-    llm = config['configurable'].get('llm')
-
-    chain = INTUITION_CHAT_SYSTEM_PROMPT_TEMPLATE | llm
+    chain = INTUITION_CHAT_SYSTEM_PROMPT_TEMPLATE | config['configurable'].get('llm')
     response = await chain.ainvoke(
         {
             'user_name': config['configurable'].get('user_name', '理灵'),
