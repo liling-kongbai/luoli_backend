@@ -1,10 +1,10 @@
 from typing import Any
 
-from ...type import Introspection, IntrospectionClassification
+from ..type import Introspection, IntrospectionClassification
 from .base_structured_output_extractor import BaseStructuredOutputExtractor
 
 
-class IntrospectClassifier(BaseStructuredOutputExtractor):
+class IntrospectionClassifier(BaseStructuredOutputExtractor):
     """反思分类器"""
 
     OUTPUT_SCHEMA = Introspection
@@ -28,14 +28,14 @@ class IntrospectClassifier(BaseStructuredOutputExtractor):
             3. 如果只是普通的打招呼或聊天对话，只要没有出现什么问题，两个维度可以直接给 3 分以上。
 
         **决策指南:**
-        - 如果 **正确性** 或 **流畅性** 评分 **都低于 3 分**，说明回复有重大缺陷，最终决策应输出“{IntrospectLayer}”（重试），并**必须**在 reason 字段中简要说明未通过的详细原因（例如：未回答用户核心问题、表述生硬、事实错误、工具报错等），以便下一轮生成时改进。
-        - 如果 **正确性** 和 **流畅性** 评分 **都达到或超过 3 分**，说明回复质量足够高，最终决策应输出“{FinalChatLayer}”（接受），reason 可留空。
+        - 如果 **正确性** 或 **流畅性** 评分 **都低于 3 分**，说明回复有重大缺陷，最终决策应输出“{Introspect}”（重试），并**必须**在 reason 字段中简要说明未通过的详细原因（例如：未回答用户核心问题、表述生硬、事实错误、工具报错等），以便下一轮生成时改进。
+        - 如果 **正确性** 和 **流畅性** 评分 **都达到或超过 3 分**，说明回复质量足够高，最终决策应输出“{Finalise}”（接受），reason 可留空。
 
         请注意，按照要求返回相关的内容，不要输出错误的格式，不要输出错误的内容，不要包含任何额外的解释或文本。
         """
 
     def _get_partial_variables(self) -> dict[str, Any]:
         return {
-            'IntrospectLayer': IntrospectionClassification.IntrospectLayer.value,
-            'FinalChatLayer': IntrospectionClassification.FinalChatLayer.value,
+            'Introspect': IntrospectionClassification.Introspect.value,
+            'Finalise': IntrospectionClassification.Finalise.value,
         }
