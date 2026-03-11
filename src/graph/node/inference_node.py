@@ -6,9 +6,9 @@ from langchain_core.messages.ai import AIMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 
-from ..prompt import EXPANDER_SYSTEM_PROMPT_TEMPLATE
+from ..extractor import ExpandGenerator
 from ..state import InferenceGraphState
-from ..type import ExpandResult, LATSTreeNode, SelectionClassification
+from ..type import LATSTreeNode, SelectionClassification
 
 logger = getLogger(__name__)
 
@@ -133,14 +133,12 @@ async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> d
 
     llm = config['configurable'].get('llm')
     try:
-        chain = EXPANDER_SYSTEM_PROMPT_TEMPLATE | llm.with_structured_output(
-            ExpandResult
-        )
+        chain = ExpandGenerator(llm).get_extractor_chain()
         result = await chain.ainvoke(
             {
                 'user_input_content': state.user_input_content,
                 'summary': current_node_context,
-                'messages': current_node_context,
+                'input': '开始生成',
             },
             config,
         )
