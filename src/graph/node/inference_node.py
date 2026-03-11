@@ -1,3 +1,4 @@
+from json import dumps
 from logging import getLogger
 from math import log, sqrt
 from traceback import format_exc
@@ -5,10 +6,11 @@ from traceback import format_exc
 from langchain_core.messages.ai import AIMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
+from langchain_core.tools.base import BaseTool
 
 from ..extractor import ExpandGenerator
 from ..state import InferenceGraphState
-from ..type import LATSTreeNode, SelectionClassification
+from ..type import ExpandAction, LATSTreeNode, SelectionClassification
 
 logger = getLogger(__name__)
 
@@ -159,3 +161,24 @@ async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> d
     except Exception:
         logger.error(f'<expander_node> 扩展器节点报错！！！\n{format_exc()}')
         return {'candidates': []}
+
+
+async def process_expand_action(
+    config: RunnableConfig,
+    expand_action: ExpandAction,
+    tool: BaseTool,
+) -> str:
+    """处理扩展行动"""
+
+    try:
+        tool_args = expand_action.tool_args or {}
+        result = await tool.ainvoke(tool_args, config)
+        observation = (
+            result if isinstance(result, str) else dumps(result, ensure_ascii=False)
+        )
+    except Exception:
+        logger.error(f'<process_expand_action> 处理扩展行动报错！！！\n{format_exc()}')
+        observation = (
+            f'工具 {expand_action.tool_name} 执行失败。\n工具参数：{tool_args}\n'
+        )
+    return observation
