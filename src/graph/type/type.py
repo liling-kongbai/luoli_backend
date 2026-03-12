@@ -66,6 +66,15 @@ class Backpropagation(BaseModel):
 
 
 # LATS 相关
+class SummariseResult(BaseModel):
+    """数据模型，总结结果"""
+
+    summary: str = Field(
+        ...,
+        description='总结内容',
+    )
+
+
 class ExpandAction(BaseModel):
     """数据模型，扩展行动"""
 
