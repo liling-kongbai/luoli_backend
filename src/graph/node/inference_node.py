@@ -264,3 +264,31 @@ async def evaluate_tree_node(
         new_node.is_pruned = True
         new_node.pruned_reason = '评估树节点报错'
         return new_node
+
+
+async def evaluator_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
+    """评估器节点"""
+
+    parent_node_id = state.current_node_id
+    parent_node = state.tree_nodes[parent_node_id]
+
+    nodes_to_evaluate = []
+    for child_id in parent_node.child_ids:
+        child_node = state.tree_nodes[child_id]
+        if child_node and child_node.visit_count == 0:
+            nodes_to_evaluate.append(child_node)
+
+    if not nodes_to_evaluate:
+        return {}
+
+    results = await gather(
+        *(
+            evaluate_tree_node(config, node, state.user_input_content)
+            for node in nodes_to_evaluate
+        ),
+        return_exceptions=True,
+    )
+    return {
+        'tree_nodes': {node.id: node for node in results},
+        'llm_call_count': state.llm_call_count + len(nodes_to_evaluate),
+    }
