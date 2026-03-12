@@ -292,3 +292,60 @@ async def evaluator_node(state: InferenceGraphState, config: RunnableConfig) -> 
         'tree_nodes': {node.id: node for node in results},
         'llm_call_count': state.llm_call_count + len(nodes_to_evaluate),
     }
+
+
+def backpropagate(
+    tree_nodes: dict[str, LATSTreeNode], leaf_node_id: str
+) -> dict[str, LATSTreeNode]:
+    """反向传播"""
+
+    updates = {}
+    current_node_id = leaf_node_id
+
+    while current_node_id:
+        current_node = tree_nodes.get(current_node_id)
+        if not current_node:
+            break
+
+        new_node = current_node.model_copy()
+        new_node.visit_count += 1
+        new_node.score_count += current_node.score_count
+
+        is_pruned = True
+        if new_node.child_ids:
+            for child_id in new_node.child_ids:
+                child_node = tree_nodes.get(child_id)
+                if not child_node or child_node.is_pruned:
+                    is_pruned = False
+                    break
+            if is_pruned:
+                new_node.is_pruned = True
+                new_node.pruned_reason = '反向传播过程中，发现子节点被剪枝！！！'
+
+        updates[new_node.id] = new_node
+        current_node_id = new_node.parent_id
+        return updates
+
+
+async def backpropagator_node(
+    state: InferenceGraphState, config: RunnableConfig
+) -> dict:
+    """反向传播器节点"""
+
+    parent_id = state.current_node_id
+    parent_node = state.tree_nodes[parent_id]
+
+    leaf_nodes = []
+    for child_id in parent_node.child_ids:
+        child_node = state.tree_nodes[child_id]
+        if child_node and child_node.visit_count == 0:
+            leaf_nodes.append(child_node)
+
+    updates = {}
+    for leaf_node in leaf_nodes:
+        updates = backpropagate(
+            tree_nodes=state.tree_nodes,
+            leaf_node_id=leaf_node.id,
+        )
+        updates.update(updates)
+    return {'tree_nodes': updates, 'iterate_count': state.iterate_count + 1}
