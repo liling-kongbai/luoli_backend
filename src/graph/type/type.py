@@ -111,6 +111,31 @@ class EvaluateResult(BaseModel):
     )
 
 
+class ActionStatus(str, Enum):
+    """枚举，行动状态"""
+
+    Completed = 'completed'  # 已完成
+    Pending = 'pending'  # 待执行
+
+
+class PlanStep(BaseModel):
+    """数据模型，计划步骤"""
+
+    id: int
+    tool_name: str | None = Field(default=None)
+    tool_args: dict[str, Any] | None = Field(default_factory=dict)
+    thought: str | None = Field(default=None)
+    status: ActionStatus | None = Field(default=None)
+    result: str | None = Field(default=None)
+
+
+class FinalExecutionPlan(BaseModel):
+    """数据模型，最终执行计划"""
+
+    original_goal: str = Field(..., description='用户原始目标')
+    steps: list[PlanStep] = Field(..., description='按顺序排列的计划步骤')
+
+
 class LATSTreeNode(BaseModel):
     """数据模型，LATS 树节点"""
 
