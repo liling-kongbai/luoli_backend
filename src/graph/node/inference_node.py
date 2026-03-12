@@ -1,3 +1,4 @@
+from asyncio.tasks import gather
 from json import dumps
 from logging import getLogger
 from math import log, sqrt
@@ -6,8 +7,8 @@ from traceback import format_exc
 from langchain_core.messages.ai import AIMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
-from langchain_core.tools.base import BaseTool
 
+from ...manager import ToolManager
 from ..extractor import ExpandGenerator
 from ..state import InferenceGraphState
 from ..type import ExpandAction, LATSTreeNode, SelectionClassification
@@ -165,19 +166,69 @@ async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> d
 async def process_expand_action(
     config: RunnableConfig,
     expand_action: ExpandAction,
-    tool: BaseTool,
-) -> str:
+    tool_manager: ToolManager,
+    current_node_id: str,
+    current_node_depth: int,
+    current_node_summary: str | None,
+) -> LATSTreeNode:
     """处理扩展行动"""
 
-    try:
-        tool_args = expand_action.tool_args or {}
-        result = await tool.ainvoke(tool_args, config)
-        observation = (
-            result if isinstance(result, str) else dumps(result, ensure_ascii=False)
+    tool = tool_manager.get_tool(tool_name := expand_action.tool_name)
+
+    if not tool:
+        logger.warning(f'<process_expand_action> 工具 {tool_name} 不存在！！！')
+        observation = f'工具 {tool_name} 不存在！！！'
+    elif not getattr(tool, 'is_safe', False):
+        logger.warning(
+            f'<process_expand_action> 工具 {tool_name} 不安全，已模拟运行，运行成功！！！'
         )
-    except Exception:
-        logger.error(f'<process_expand_action> 处理扩展行动报错！！！\n{format_exc()}')
-        observation = (
-            f'工具 {expand_action.tool_name} 执行失败。\n工具参数：{tool_args}\n'
-        )
-    return observation
+        observation = f'工具 {tool_name} 不安全，已模拟运行，运行成功！！！'
+    else:
+        try:
+            tool_args = expand_action.tool_args or {}
+            result = await tool.ainvoke(tool_args, config)
+            observation = (
+                result if isinstance(result, str) else dumps(result, ensure_ascii=False)
+            )
+        except Exception:
+            logger.error(
+                f'<process_expand_action> 处理扩展行动报错！！！\n{format_exc()}'
+            )
+            observation = f'工具 {tool_name} 执行失败。\n工具参数：{tool_args}\n'
+    return LATSTreeNode(
+        parent_id=current_node_id,
+        action=expand_action,
+        observation=observation,
+        depth=current_node_depth + 1,
+        summary=current_node_summary,
+    )
+
+
+async def executor_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
+    """执行器节点"""
+
+    tool_manager = config['configurable'].get('tool_manager')
+    current_node_id = state.current_node_id
+    current_node = state.tree_nodes[current_node_id]
+
+    results = await gather(
+        *(
+            process_expand_action(
+                config,
+                expand_action,
+                tool_manager,
+                current_node_id,
+                current_node.depth,
+                current_node.summary,
+            )
+            for expand_action in state.candidates
+        ),
+        return_exceptions=True,
+    )
+
+    new_nodes = {}
+    for result in results:
+        new_nodes[result.id] = result
+    parent_node = current_node.model_copy()
+    parent_node.children_ids.extend(list(new_nodes.keys()))
+    return {'tree_nodes': new_nodes}
