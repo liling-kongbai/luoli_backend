@@ -1,3 +1,4 @@
+from .evaluate_generator import EvaluateGenerator
 from .expand_generator import ExpandGenerator
 from .intent_classifier import IntentClassifier
 from .introspection_classifier import IntrospectionClassifier
