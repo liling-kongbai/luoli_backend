@@ -17,7 +17,7 @@ logger = getLogger(__name__)
 
 def compute_uct_score(
     child_visit_count: int,
-    child_score_count: int,
+    child_score_count: float,
     parent_visit_count: int,
     exploration_c: float = 1.414,
 ) -> float:
@@ -122,20 +122,19 @@ async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> d
     context_nodes_trajectory = get_context_nodes_trajectory(tree_nodes, current_node_id)
     recent_context_nodes_trajectory = context_nodes_trajectory[-recent_depth:]
     for node in recent_context_nodes_trajectory:
-        if node.action:
+        if node_action := node.action:
             current_node_context.append(
                 AIMessage(
-                    f'内部思考：{node.action.thought}\n需要调用的工具：{node.action.tool_name}\n需要调用的工具的参数：{node.action.tool_args}'
+                    f'内部思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}'
                 )
             )
-        if node.observation:
+        if node_observation := node.observation:
             current_node_context.append(
-                HumanMessage(f'工具运行情况：{node.observation}')
+                HumanMessage(f'工具运行情况：{node_observation}')
             )
 
-    llm = config['configurable'].get('llm')
     try:
-        chain = ExpandGenerator(llm).get_extractor_chain()
+        chain = ExpandGenerator(config['configurable'].get('llm')).get_extractor_chain()
         result = await chain.ainvoke(
             {
                 'user_input_content': state.user_input_content,
