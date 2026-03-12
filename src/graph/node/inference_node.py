@@ -9,9 +9,9 @@ from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 
 from ...manager import ToolManager
-from ..extractor import EvaluateGenerator, ExpandGenerator
+from ..extractor import EvaluateGenerator, ExpandGenerator, FinalPlanGenerator
 from ..state import InferenceGraphState
-from ..type import ExpandAction, LATSTreeNode, SelectionClassification
+from ..type import ExecutionPlan, ExpandAction, LATSTreeNode, SelectionClassification
 
 logger = getLogger(__name__)
 
@@ -327,9 +327,7 @@ def backpropagate(
         return updates
 
 
-async def backpropagator_node(
-    state: InferenceGraphState, config: RunnableConfig
-) -> dict:
+def backpropagator_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
     """反向传播器节点"""
 
     parent_id = state.current_node_id
@@ -349,3 +347,56 @@ async def backpropagator_node(
         )
         updates.update(updates)
     return {'tree_nodes': updates, 'iterate_count': state.iterate_count + 1}
+
+
+async def finaliser_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
+    """最终器节点"""
+
+    tree_nodes = state.tree_nodes
+    root_node_id = state.root_id
+
+    best_node = None
+    best_score = -float('inf')
+
+    for node in tree_nodes.values():
+        if node.is_pruned:
+            continue
+
+        if node.is_completed:
+            best_node = node
+            break
+
+        score = node.score_count / node.visit_count
+        if node.visit_count > 0 and score > best_score:
+            best_score = score
+            best_node = node
+
+    if not best_node:
+        return tree_nodes.get(root_node_id)
+
+    trajectory = get_context_nodes_trajectory(tree_nodes, best_node.id)
+    trajectory_summary = '\n'.join(
+        f'步骤{i + 1}：内部思考：{node.action.thought}\n需要调用的工具：{node.action.tool_name}\n需要调用的工具的参数：{node.action.tool_args}\n工具运行情况：{node.observation}'
+        for i, node in enumerate(trajectory)
+    )
+
+    try:
+        chain = FinalPlanGenerator(
+            config['configurable'].get('llm')
+        ).get_extractor_chain()
+        result = await chain.ainvoke(
+            {
+                'user_input_content': state.user_input_content,
+                'trajectory': trajectory_summary,
+                'input': '开始生成执行计划',
+            },
+            config,
+        )
+        return {'final_plan': result.final_plan}
+    except Exception:
+        logger.error(f'<finaliser_node> 最终器节点报错！！！\n{format_exc()}')
+        return {
+            'final_plan': ExecutionPlan(
+                original_goal=state.user_input_content, steps=[]
+            )
+        }
