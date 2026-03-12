@@ -4,6 +4,7 @@ from .type import (
     EvaluateResult,
     ExpandAction,
     ExpandResult,
+    FinalExecutionPlan,
     Intent,
     IntentClassification,
     Introspection,
