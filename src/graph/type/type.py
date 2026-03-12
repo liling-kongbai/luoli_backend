@@ -93,6 +93,24 @@ class ExpandResult(BaseModel):
     )
 
 
+class EvaluateResult(BaseModel):
+    """数据模型，评估结果"""
+
+    analysis: str = Field(
+        ...,
+        description='评估分析：这个结果对解决最终目标有帮助吗？好在哪里？不好在哪里？正确在哪里？错误在哪里？',
+    )
+    score: float = Field(..., ge=0.0, le=10.0, description='评估分数')
+    is_completed: bool = Field(
+        ...,
+        description='如果当前情况已经足以解决用户的初始目标，则为 True；否则为 False',
+    )
+    is_pruned: bool = Field(
+        ...,
+        description='如果发现这是一条绝对走不通的死胡同或评估分数为 0，则为 True；否则为 False',
+    )
+
+
 class LATSTreeNode(BaseModel):
     """数据模型，LATS 树节点"""
 
