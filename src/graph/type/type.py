@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 from pydantic import Field
 from pydantic.main import BaseModel
@@ -32,14 +33,14 @@ class Introspection(BaseModel):
     """数据模型，反思"""
 
     introspection: IntrospectionClassification
-    reason: str | None = Field(default=None)  # 原因
+    reason: str | None = Field(default=None)
 
 
 # 选择相关
 class SelectionClassification(str, Enum):
     """枚举，选择类别"""
 
-    Expand = 'expand'  # 展开
+    Expand = 'expand'  # 扩展
     Summarise = 'summarise'  # 总结
     Finalise = 'finalise'  # 最终
 
@@ -90,3 +91,26 @@ class ExpandResult(BaseModel):
         max_length=3,
         description='生成 0 到 3 个截然不同的行动方案。如果认为任务已经彻底完成，请返回空列表',
     )
+
+
+class LATSTreeNode(BaseModel):
+    """数据模型，LATS 树节点"""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    parent_id: str | None = Field(default=None)
+    child_ids: list[str] = Field(default_factory=list)
+    depth: int = Field(default=0)
+    summary: str | None = Field(default=None)
+
+    # UCT 相关
+    visit_count: int = Field(default=0)
+    score_count: float = Field(default=0.0)
+
+    # 动作相关
+    action: ExpandAction | None = Field(default=None)
+    observation: str | None = Field(default=None)
+
+    # 状态相关
+    is_completed: bool = Field(default=False)
+    is_pruned: bool = Field(default=False)
+    pruned_reason: str | None = Field(default=None)
