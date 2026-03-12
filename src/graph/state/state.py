@@ -9,7 +9,7 @@ from pydantic.main import BaseModel
 class MainGraphState(BaseModel):
     """主图状态"""
 
-    messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=[])
+    messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=list)
 
     # 意图相关
     intent: str | None = Field(default=None)
@@ -18,7 +18,7 @@ class MainGraphState(BaseModel):
 class RoutineGraphState(BaseModel):
     """常规层图状态"""
 
-    messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=[])
+    messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=list)
     user_input_content: str | None = Field(default=None)  # 用户输入内容
     response_draft_content: str | None = Field(default=None)  # 响应草稿内容
 
