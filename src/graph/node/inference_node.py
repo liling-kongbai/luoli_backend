@@ -9,7 +9,7 @@ from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 
 from ...manager import ToolManager
-from ..extractor import ExpandGenerator
+from ..extractor import EvaluateGenerator, ExpandGenerator
 from ..state import InferenceGraphState
 from ..type import ExpandAction, LATSTreeNode, SelectionClassification
 
@@ -232,3 +232,35 @@ async def executor_node(state: InferenceGraphState, config: RunnableConfig) -> d
     parent_node = current_node.model_copy()
     parent_node.children_ids.extend(list(new_nodes.keys()))
     return {'tree_nodes': new_nodes}
+
+
+async def evaluate_tree_node(
+    config: RunnableConfig, node: LATSTreeNode, user_input_content: str
+) -> LATSTreeNode:
+    """评估树节点"""
+
+    evaluate_message = f'动作：{node.action.thought}\n工具：{node.action.tool_name}\n工具参数：{node.action.tool_args}\n观察：{node.observation}'
+    try:
+        chain = EvaluateGenerator(
+            config['configurable'].get('llm')
+        ).get_extractor_chain()
+        result = await chain.ainvoke(
+            {
+                'user_input_content': user_input_content,
+                'input': evaluate_message,
+            },
+            config,
+        )
+        new_node = node.model_copy()
+        if result.is_pruned or result.score == 0:
+            new_node.is_pruned = True
+            new_node.pruned_reason = result.analysis
+        new_node.score_count = result.score
+        new_node.is_completed = result.is_completed
+        return new_node
+    except Exception:
+        logger.error(f'<evaluate_tree_node> 评估树节点报错！！！\n{format_exc()}')
+        new_node = node.model_copy()
+        new_node.is_pruned = True
+        new_node.pruned_reason = '评估树节点报错'
+        return new_node
