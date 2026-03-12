@@ -12,4 +12,5 @@ from .type import (
     LATSTreeNode,
     Selection,
     SelectionClassification,
+    SummariseResult,
 )
