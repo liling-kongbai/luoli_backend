@@ -5,6 +5,8 @@ from langgraph.graph.message import add_messages
 from pydantic import Field
 from pydantic.main import BaseModel
 
+from ..type import LATSTreeNode
+
 
 class MainGraphState(BaseModel):
     """主图状态"""
@@ -26,3 +28,12 @@ class RoutineGraphState(BaseModel):
     introspect_count: int = Field(default=0)
     introspection: str | None = Field(default=None)
     introspect_reason: str | None = Field(default=None)
+
+
+# LATS 相关
+def merge_tree_nodes(
+    left: dict[str, LATSTreeNode], right: dict[str, LATSTreeNode]
+) -> dict[str, LATSTreeNode]:
+    """合并树节点"""
+
+    return (left or {}) | (right or {})
