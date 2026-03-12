@@ -1,42 +1,50 @@
 from langchain_core.runnables.config import RunnableConfig
+from langgraph.prebuilt.tool_node import ToolNode
 
 from ..prompt import (
     ROUTINE_CHAT_SYSTEM_PROMPT_TEMPLATE,
     ROUTINE_FINAL_CHAT_SYSTEM_PROMPT_TEMPLATE,
 )
+from ..state import RoutineGraphState
 
 
-async def routine_chat_node(state, config: RunnableConfig) -> dict:
+async def routine_chat_node(state: RoutineGraphState, config: RunnableConfig) -> dict:
     """常规层对话节点"""
-
-    llm = config['configurable'].get('llm')
 
     if introspect_reason := state.introspect_reason:
         introspect_reason_prompt = f'上一轮结果经过反思评估后，未通过，请针对以下反馈进行改进：{introspect_reason}'
+        introspect_reason = None
     else:
         introspect_reason_prompt = ''
 
-    chain = ROUTINE_CHAT_SYSTEM_PROMPT_TEMPLATE | llm
+    chain = ROUTINE_CHAT_SYSTEM_PROMPT_TEMPLATE | config['configurable'].get('llm')
     response = await chain.ainvoke(
         {
             'user_name': config['configurable'].get('user_name', '理灵'),
-            'introspect_reason': introspect_reason_prompt,
+            'introspect_reason_prompt': introspect_reason_prompt,
             'messages': state.messages,
         },
         config,
     )
-    return {
-        'messages': [response],
-        'introspect_reason': None,
-    }
+    return {'messages': [response], 'introspect_reson': introspect_reason}
 
 
-async def routine_final_chat_node(state, config: RunnableConfig) -> dict:
+async def routine_tools_call_node(
+    state: RoutineGraphState, config: RunnableConfig
+) -> dict:
+    """常规层工具调用节点"""
+
+    return await ToolNode(config['configurable'].get('tools')).ainvoke(state, config)
+
+
+async def routine_final_chat_node(
+    state: RoutineGraphState, config: RunnableConfig
+) -> dict:
     """常规层最终对话节点"""
 
-    llm = config['configurable'].get('llm')
-
-    chain = ROUTINE_FINAL_CHAT_SYSTEM_PROMPT_TEMPLATE | llm
+    chain = ROUTINE_FINAL_CHAT_SYSTEM_PROMPT_TEMPLATE | config['configurable'].get(
+        'llm'
+    )
     response = await chain.ainvoke(
         {
             'user_input_content': state.user_input_content,
