@@ -1,6 +1,7 @@
 from asyncio.tasks import gather
 from logging import getLogger
 from traceback import format_exc
+from typing import Any
 
 from fastapi import WebSocket
 
@@ -56,7 +57,7 @@ class WebSocketConnectionManager:
         self,
         user_id: str,
         message_type: str,
-        message_payload: any,
+        message_payload: Any,
         message_thread_id: str | None = None,
     ):
         """发送消息"""
@@ -73,14 +74,8 @@ class WebSocketConnectionManager:
         ]
         await gather(*tasks, return_exceptions=True)
 
-    async def broadcast(self, message_type: str, message_payload: any):
+    async def broadcast(self, message_type: str, message_payload: Any):
         """广播"""
 
         for user_id in self._connections:
-            await self.send_message(
-                user_id,
-                {
-                    'luoli_backend_message_type': message_type,
-                    'luoli_backend_message_payload': message_payload,
-                },
-            )
+            await self.send_message(user_id, message_type, message_payload)
