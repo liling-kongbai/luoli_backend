@@ -12,7 +12,7 @@ def connect_ollama_llm(
 
     params = {'model': model}
     params['base_url'] = base_url or r'http://localhost:11434'
-    if temperature is not None:
+    if temperature:
         params['temperature'] = temperature
     return ChatOllama(**params)
 
@@ -24,6 +24,6 @@ def connect_deepseek_llm(
 
     params = {'model': model}
     params['api_key'] = api_key or getenv('DEEPSEEK_API_KEY')
-    if temperature is not None:
+    if temperature:
         params['temperature'] = temperature
     return ChatDeepSeek(**params)
