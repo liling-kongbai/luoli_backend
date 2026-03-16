@@ -1,6 +1,9 @@
 from logging import getLogger
 from traceback import format_exc
+from typing import Any
 
+from langchain_core.messages.human import HumanMessage
+from langchain_core.runnables.config import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg.connection_async import AsyncConnection
 from psycopg_pool.pool_async import AsyncConnectionPool
@@ -42,4 +45,26 @@ class DatabaseManager:
             logger.error(
                 f'<init_postgresql> 初始化 PostgreSQL 数据库相关内容报错！！！\n{format_exc()}'
             )
+            raise
+
+    async def load_chat_history(self, thread_id: str) -> list[dict[str, Any]]:
+        """加载对话历史"""
+
+        try:
+            checkpoint_tuple = await self._async_postgresql_saver.aget_tuple(
+                RunnableConfig(configurable={'thread_id': thread_id})
+            )
+            messages = checkpoint_tuple['channel_values'].get('messages', [])
+
+            chat_history = []
+            for message in messages:
+                chat_history.append(
+                    {
+                        'is_user': isinstance(message, HumanMessage),
+                        'content': message.content,
+                    }
+                )
+            return chat_history
+        except Exception:
+            logger.error(f'<load_chat_history> 加载对话历史报错！！！\n{format_exc()}')
             raise
