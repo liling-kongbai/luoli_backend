@@ -1,6 +1,7 @@
 from logging import DEBUG, INFO, FileHandler, Formatter, StreamHandler, getLogger
 from logging.handlers import QueueHandler, QueueListener
-from os import makedirs, path
+from os import makedirs
+from os.path import dirname
 from queue import Queue
 
 
@@ -18,10 +19,9 @@ def set_async_logger(
     Returns:
         QueueListener: 日志队列监听器
 
-    Warning:
+    Warnings:
         1: 全局仅调用一次
         2: 返回 QueueListener 对象，需要在程序退出之前调用 stop() 停止
-        3: 可使用 try...finally 结构，在 finally 中调用 stop() 停止
     """
 
     root_logger = getLogger()
@@ -39,7 +39,7 @@ def set_async_logger(
     handlers.append(console_handler)
 
     if log_file_path:
-        log_file_dir = path.dirname(log_file_path)
+        log_file_dir = dirname(log_file_path)
         if log_file_dir:
             makedirs(log_file_dir, exist_ok=True)
         file_handler = FileHandler(log_file_path, encoding='utf-8')
