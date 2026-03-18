@@ -13,7 +13,6 @@ async def routine_chat_node(state: RoutineGraphState, config: RunnableConfig) ->
 
     if introspect_reason := state.introspect_reason:
         introspect_reason_prompt = f'上一轮结果经过反思评估后，未通过，请针对以下反馈进行改进：{introspect_reason}'
-        introspect_reason = None
     else:
         introspect_reason_prompt = ''
 
@@ -26,7 +25,7 @@ async def routine_chat_node(state: RoutineGraphState, config: RunnableConfig) ->
         },
         config,
     )
-    return {'messages': [response], 'introspect_reson': introspect_reason}
+    return {'messages': [response], 'introspect_reson': None}
 
 
 async def routine_tools_call_node(
@@ -34,7 +33,11 @@ async def routine_tools_call_node(
 ) -> dict:
     """常规层工具调用节点"""
 
-    return await ToolNode(config['configurable'].get('tools')).ainvoke(state, config)
+    return {
+        'messages': [
+            await ToolNode(config['configurable'].get('tools')).ainvoke(state, config)
+        ]
+    }
 
 
 async def routine_final_chat_node(
