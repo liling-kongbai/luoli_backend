@@ -6,77 +6,85 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 logger = getLogger(__name__)
 
-SAFE_TOOLS_WHITELIST = [
-    'search',
-    'weather',
-]
+SAFE_TOOLS_NAME_LIST = ['search', 'weather']
 
 
 class ToolManager:
     """工具管理器"""
 
-    def __init__(self, safe_tools_whitelist: list[str]):
-        self._safe_tools_whitelist = safe_tools_whitelist
-        self._tools: list[BaseTool] = []
-        self._safe_tools: dict[str, BaseTool] = {}
-        self._tool_is_safe: dict[str, bool] = {}
-        self._mcp_server = None
+    def __init__(self, safe_tools_name_list: list[str] | None = SAFE_TOOLS_NAME_LIST):
+        self._safe_tools_name_list: list[str] | None = safe_tools_name_list
+        self._tools: list[BaseTool] | None = None
+        self._safe_tools: list[BaseTool] | None = None
+        self._mcp_clinet: MultiServerMCPClient | None = None
 
-    def register_and_tag_tools(self, tools: list[BaseTool]):
-        """注册并标记工具"""
+    def clean(self):
+        """清理"""
 
-        for tool in tools:
-            self._safe_tools[tool.name] = tool
-            self._tool_is_safe[tool.name] = tool.name in self._safe_tools_whitelist
+        self._safe_tools = None
+        self._tools = None
+        self._mcp_clinet = None
 
-    def get_tools(self) -> list[BaseTool]:
-        """获取工具"""
-
-        return list[BaseTool](self._tools)
-
-    def get_safe_tools(self) -> list[BaseTool]:
-        """获取安全工具"""
-
-        return list[BaseTool](self._safe_tools)
-
-    def get_tool(self, tool_name: str) -> BaseTool:
-        """获取工具"""
-
-        return self._tools.get(tool_name)
-
-    def create_mcp_client(self, path: str):
+    def create_mcp_client(self, args_path: str, cwd_path: str):
         """创建 MCP 客户端"""
 
-        try:
-            if self._mcp_server is not None:
-                logger.warning('<connect_mcp_server> MCP 服务器已连接！！！')
-                return
+        if self._mcp_clinet:
+            logger.warning(
+                '<create_mcp_client> MCP 客户端已创建，请勿重复创建，请检查代码逻辑！！！'
+            )
+            return
 
-            self._mcp_server = MultiServerMCPClient(
+        try:
+            self._mcp_clinet = MultiServerMCPClient(
                 {
                     'test': {
                         'transport': 'stdio',
                         'command': 'uv',
-                        'args': ['run', path],
-                        'cwd': path,
+                        'args': ['run', args_path],
+                        'cwd': cwd_path,
                     }
                 }
             )
         except Exception:
             logger.error(
-                f'<connect_mcp_server> 连接 MCP 服务器失败！！！\n{format_exc()}'
+                f'<create_mcp_client> 创建 MCP 客户端报错！！！\n{format_exc()}'
             )
             raise
 
-    async def get_mcp_tools(self) -> list[BaseTool]:
+    async def get_mcp_tools(self):
         """获取 MCP 工具"""
 
-        try:
-            if self._mcp_server is None:
-                logger.warning('<get_mcp_tools> MCP 客户端未创建！！！')
-                return []
+        if not self._mcp_clinet:
+            logger.warning('<get_mcp_tools> MCP 客户端未创建，请检查代码逻辑！！！')
+            return
 
-            return self._tools.extend(await self._mcp_server.get_tools())
+        try:
+            self._tools.extend(await self._mcp_clinet.get_tools())
         except Exception:
-            logger.error(f'<get_mcp_tools> 获取 MCP 工具失败！！！\n{format_exc()}')
+            logger.error(f'<get_mcp_tools> 获取 MCP 工具报错！！！\n{format_exc()}')
             raise
+
+    def register_safe_tools(self):
+        """注册安全工具"""
+
+        for tool in self._tools:
+            if tool.name in self._safe_tools_name_list:
+                self._safe_tools.append(tool)
+
+    def get_tools(self) -> list[BaseTool]:
+        """获取工具"""
+
+        return self._tools
+
+    def get_safe_tools(self) -> list[BaseTool]:
+        """获取安全工具"""
+
+        return self._safe_tools
+
+    def get_tool(self, tool_name: str) -> BaseTool | None:
+        """获取工具"""
+
+        for tool in self._tools:
+            if tool.name == tool_name:
+                return tool
+        return None
