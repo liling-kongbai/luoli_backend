@@ -8,7 +8,7 @@ from langchain_core.runnables.config import RunnableConfig
 
 from ..extractor import EvaluateGenerator, ExpandGenerator, FinalPlanGenerator
 from ..state import InferenceGraphState
-from ..type import ExecutionPlan, ExpandAction, LATSTreeNode, SelectionClassification
+from ..type import ExpandAction, LATSTreeNode, SelectionClassification
 
 logger = getLogger(__name__)
 
@@ -102,18 +102,18 @@ def get_context_nodes_trajectory(
     return context_nodes_trajectory[::-1]
 
 
-async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
-    """扩展器节点"""
+def get_nodes_context(state: InferenceGraphState, config: RunnableConfig) -> str:
+    """获取节点上下文"""
 
     current_node_id = state.current_node_id
     tree_nodes = state.tree_nodes
     current_node = tree_nodes[current_node_id]
 
-    current_node_context = ''
+    current_nodes_context = ''
 
     recent_depth = current_node.depth % config['configurable'].get('summarise_depth')
     if current_node_summary := current_node.summary:
-        current_node_context += f'前情提要/记忆总结：{current_node_summary}\n'
+        current_nodes_context += f'前情提要/记忆总结：{current_node_summary}\n'
 
     if recent_depth != 0 or not current_node_summary:
         context_nodes_trajectory = get_context_nodes_trajectory(
@@ -121,16 +121,20 @@ async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> d
         )
         for node in context_nodes_trajectory:
             if node_action := node.action:
-                current_node_context += f'内部思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n'
+                current_nodes_context += f'内部思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n'
             if node_observation := node.observation:
-                current_node_context += f'工具运行情况：{node_observation}\n'
+                current_nodes_context += f'工具运行情况：{node_observation}\n'
+
+
+async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
+    """扩展器节点"""
 
     try:
         chain = ExpandGenerator(config['configurable'].get('llm')).get_extractor_chain()
         result = await chain.ainvoke(
             {
                 'user_input_content': state.user_input_content,
-                'current_node_context': current_node_context,
+                'current_node_context': get_nodes_context(state, config),
                 'input': '开始生成',
             },
             config,
@@ -216,24 +220,34 @@ async def executor_node(state: InferenceGraphState, config: RunnableConfig) -> d
     return {'tree_nodes': new_nodes}
 
 
-async def evaluate_tree_node(
-    config: RunnableConfig, node: LATSTreeNode, user_input_content: str
+async def evaluate_leaf_node(
+    state: InferenceGraphState, config: RunnableConfig, leaf_node: LATSTreeNode
 ) -> LATSTreeNode:
-    """评估树节点"""
+    """评估叶子节点"""
 
-    evaluate_message = f'动作：{node.action.thought}\n工具：{node.action.tool_name}\n工具参数：{node.action.tool_args}\n观察：{node.observation}'
+    current_nodes_context = ''
+    context_nodes_trajectory = get_context_nodes_trajectory(
+        state.tree_nodes, leaf_node.id, leaf_node.depth
+    )
+    for node in context_nodes_trajectory:
+        if node_action := node.action:
+            current_nodes_context += f'内部思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n'
+        if node_observation := node.observation:
+            current_nodes_context += f'工具运行情况：{node_observation}\n'
+
     try:
         chain = EvaluateGenerator(
             config['configurable'].get('llm')
         ).get_extractor_chain()
         result = await chain.ainvoke(
             {
-                'user_input_content': user_input_content,
-                'input': evaluate_message,
+                'user_input_content': state.user_input_content,
+                'current_node_context': current_nodes_context,
+                'input': '开始评估',
             },
             config,
         )
-        new_node = node.model_copy()
+        new_node = leaf_node.model_copy()
         if result.is_pruned or result.score == 0:
             new_node.is_pruned = True
             new_node.pruned_reason = result.analysis
@@ -241,18 +255,17 @@ async def evaluate_tree_node(
         new_node.is_completed = result.is_completed
         return new_node
     except Exception:
-        logger.error(f'<evaluate_tree_node> 评估树节点报错！！！\n{format_exc()}')
-        new_node = node.model_copy()
+        logger.error(f'<evaluate_leaf_node> 评估叶子节点报错！！！\n{format_exc()}')
+        new_node = leaf_node.model_copy()
         new_node.is_pruned = True
-        new_node.pruned_reason = '评估树节点报错'
+        new_node.pruned_reason = f'评估叶子节点报错！！！\n{format_exc()}'
         return new_node
 
 
 async def evaluator_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
     """评估器节点"""
 
-    parent_node_id = state.current_node_id
-    parent_node = state.tree_nodes[parent_node_id]
+    parent_node = state.tree_nodes[state.current_node_id]
 
     nodes_to_evaluate = []
     for child_id in parent_node.child_ids:
@@ -264,25 +277,24 @@ async def evaluator_node(state: InferenceGraphState, config: RunnableConfig) -> 
         return {}
 
     results = await gather(
-        *(
-            evaluate_tree_node(config, node, state.user_input_content)
-            for node in nodes_to_evaluate
-        ),
+        *(evaluate_leaf_node(state, config, node) for node in nodes_to_evaluate),
         return_exceptions=True,
     )
     return {
-        'tree_nodes': {node.id: node for node in results},
+        'tree_nodes': {
+            node.id: node for node in results if not isinstance(node, Exception)
+        },
         'llm_call_count': state.llm_call_count + len(nodes_to_evaluate),
     }
 
 
 def backpropagate(
-    tree_nodes: dict[str, LATSTreeNode], leaf_node_id: str
+    tree_nodes: dict[str, LATSTreeNode], node_id: str, node_score: float
 ) -> dict[str, LATSTreeNode]:
     """反向传播"""
 
     updates = {}
-    current_node_id = leaf_node_id
+    current_node_id = node_id
 
     while current_node_id:
         current_node = tree_nodes.get(current_node_id)
@@ -291,76 +303,72 @@ def backpropagate(
 
         new_node = current_node.model_copy()
         new_node.visit_count += 1
-        new_node.score_count += current_node.score_count
+        new_node.score_count += node_score
 
-        is_pruned = True
         if new_node.child_ids:
+            is_pruned = True
+
             for child_id in new_node.child_ids:
-                child_node = tree_nodes.get(child_id)
-                if not child_node or child_node.is_pruned:
+                child_node = updates.get(child_id) or tree_nodes.get(child_id)
+                if child_node and not child_node.is_pruned:
                     is_pruned = False
                     break
-            if is_pruned:
+
+            if is_pruned and not new_node.is_pruned:
                 new_node.is_pruned = True
-                new_node.pruned_reason = '反向传播过程中，发现子节点被剪枝！！！'
+                if not new_node.pruned_reason:
+                    new_node.pruned_reason = '反向传播过程中，发现子节点被剪枝！！！'
 
         updates[new_node.id] = new_node
         current_node_id = new_node.parent_id
-        return updates
+    return updates
 
 
 def backpropagator_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
     """反向传播器节点"""
 
-    parent_id = state.current_node_id
-    parent_node = state.tree_nodes[parent_id]
+    tree_nodes = state.tree_nodes
+    parent_node = tree_nodes[state.current_node_id]
 
-    leaf_nodes = []
+    valid_child_nodes = []
     for child_id in parent_node.child_ids:
-        child_node = state.tree_nodes[child_id]
+        child_node = tree_nodes[child_id]
         if child_node and child_node.visit_count == 0:
-            leaf_nodes.append(child_node)
+            valid_child_nodes.append(child_node)
 
-    updates = {}
-    for leaf_node in leaf_nodes:
-        updates = backpropagate(
-            tree_nodes=state.tree_nodes,
-            leaf_node_id=leaf_node.id,
+    if not valid_child_nodes:
+        return {'iterate_count': state.iterate_count + 1}
+
+    new_updates = {}
+    for valid_child_node in valid_child_nodes:
+        new_updates.update(
+            backpropagate(
+                tree_nodes=tree_nodes.copy(),
+                node_id=valid_child_node.id,
+                node_score=valid_child_node.score_count,
+            )
         )
-        updates.update(updates)
-    return {'tree_nodes': updates, 'iterate_count': state.iterate_count + 1}
+    return {'tree_nodes': new_updates, 'iterate_count': state.iterate_count + 1}
 
 
 async def finaliser_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
     """最终器节点"""
 
     tree_nodes = state.tree_nodes
-    root_node_id = state.root_id
 
     best_node = None
-    best_score = -float('inf')
-
-    for node in tree_nodes.values():
-        if node.is_pruned:
-            continue
-
-        if node.is_completed:
-            best_node = node
-            break
-
-        score = node.score_count / node.visit_count
-        if node.visit_count > 0 and score > best_score:
-            best_score = score
-            best_node = node
-
+    completed_nodes = [node for node in tree_nodes.values() if node.is_completed]
+    if completed_nodes:
+        base_node = max(completed_nodes, key=lambda node: node.score_count)
     if not best_node:
-        return tree_nodes.get(root_node_id)
+        return
 
-    trajectory = get_context_nodes_trajectory(tree_nodes, best_node.id)
-    trajectory_summary = '\n'.join(
-        f'步骤{i + 1}：内部思考：{node.action.thought}\n需要调用的工具：{node.action.tool_name}\n需要调用的工具的参数：{node.action.tool_args}\n工具运行情况：{node.observation}'
-        for i, node in enumerate(trajectory)
-    )
+    trajectory = get_context_nodes_trajectory(tree_nodes, base_node.id, base_node.depth)
+    trajectory_summary = ''
+    for i, node in enumerate(trajectory):
+        if not node.action:
+            continue
+        trajectory_summary += f'步骤{i + 1}：内部思考：{node.action.thought}\n需要调用的工具：{node.action.tool_name}\n需要调用的工具的参数：{node.action.tool_args}\n工具运行情况：{node.observation}\n'
 
     try:
         chain = FinalPlanGenerator(
@@ -374,11 +382,6 @@ async def finaliser_node(state: InferenceGraphState, config: RunnableConfig) -> 
             },
             config,
         )
-        return {'final_plan': result.final_plan}
+        return {'final_plan': result}
     except Exception:
         logger.error(f'<finaliser_node> 最终器节点报错！！！\n{format_exc()}')
-        return {
-            'final_plan': ExecutionPlan(
-                original_goal=state.user_input_content, steps=[]
-            )
-        }
