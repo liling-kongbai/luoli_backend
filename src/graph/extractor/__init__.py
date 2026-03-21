@@ -3,3 +3,4 @@ from .expand_generator import ExpandGenerator
 from .final_plan_generator import FinalPlanGenerator
 from .intent_classifier import IntentClassifier
 from .introspection_classifier import IntrospectionClassifier
+from .summarise_generator import SummariseGenerator
