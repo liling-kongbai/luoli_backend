@@ -6,7 +6,12 @@ from traceback import format_exc
 
 from langchain_core.runnables.config import RunnableConfig
 
-from ..extractor import EvaluateGenerator, ExpandGenerator, FinalPlanGenerator
+from ..extractor import (
+    EvaluateGenerator,
+    ExpandGenerator,
+    FinalPlanGenerator,
+    SummariseGenerator,
+)
 from ..state import InferenceGraphState
 from ..type import ExpandAction, LATSTreeNode, SelectionClassification
 
@@ -100,6 +105,52 @@ def get_context_nodes_trajectory(
         current_node_id = current_node.parent_id
         current_context_depth += 1
     return context_nodes_trajectory[::-1]
+
+
+async def summariser_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
+    """总结器节点"""
+
+    current_node_id = state.current_node_id
+    tree_nodes = state.tree_nodes
+    current_node = tree_nodes[current_node_id]
+
+    trajectory = get_context_nodes_trajectory(tree_nodes, current_node_id, 5)
+
+    old_summary = '无'
+    for node in trajectory:
+        if node.summary:
+            old_summary = node.summary
+            break
+
+    recent_action_history = ''
+    for node in trajectory:
+        if node_action := node.action:
+            recent_action_history += f'内部思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n'
+        if node_observation := node.observation:
+            recent_action_history += f'工具运行情况：{node_observation}\n'
+
+    try:
+        chain = SummariseGenerator(
+            config['configurable'].get('llm')
+        ).get_extractor_chain()
+        result = await chain.ainvoke(
+            {
+                'old_summary': old_summary,
+                'recent_action_history': recent_action_history,
+                'input': '开始压缩记忆',
+            },
+            config,
+        )
+
+        updated_node = current_node.model_copy()
+        updated_node.summary = result.summary
+        return {
+            'tree_nodes': {current_node_id: updated_node},
+            'llm_call_count': state.llm_call_count + 1,
+        }
+    except Exception:
+        logger.error(f'<summariser_node> 总结器节点报错！！！\n{format_exc()}')
+        return {}
 
 
 def get_nodes_context(state: InferenceGraphState, config: RunnableConfig) -> str:
