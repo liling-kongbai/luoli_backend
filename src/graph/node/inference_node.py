@@ -71,24 +71,28 @@ def select_best_leaf_node(
         current_node_id = best_leaf_node.id
 
 
-def selector_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
-    """选择器节点"""
+def inference_selector_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
+    """推理层选择器节点"""
 
-    if state.iterate_count > config['configurable'].get('max_iterate_count'):
-        logger.warning('<selector_node> 迭代计数超过最大迭代计数，停止推理！！！')
-        return {'current_node_id': SelectionClassification.Finalise.value}
+    if state.iterate_count > config['configurable'].get('max_iterate_count', 10):
+        logger.warning(
+            '<inference_selector_node> 迭代计数超过最大迭代计数，停止推理！！！'
+        )
+        return {'current_node_id': SelectionClassification.Finalize.value}
 
     try:
         return {
             'current_node_id': select_best_leaf_node(
-                state.root_id,
+                state.root_node_id,
                 state.tree_nodes,
                 config['configurable'].get('exploration_c'),
             )
         }
     except Exception:
-        logger.error(f'<selector_node> 选择器节点报错！！！\n{format_exc()}')
-        return {'current_node_id': SelectionClassification.Finalise.value}
+        logger.error(
+            f'<inference_selector_node> 推理层选择器节点报错！！！\n{format_exc()}'
+        )
+        return {'current_node_id': SelectionClassification.Finalize.value}
 
 
 def get_context_nodes_trajectory(
