@@ -19,32 +19,32 @@ logger = getLogger(__name__)
 
 
 def compute_uct_score(
-    child_visit_count: int,
-    child_score_count: float,
-    parent_visit_count: int,
+    child_node_visit_count: int,
+    child_node_score_count: float,
+    parent_node_visit_count: int,
     exploration_c: float = 1.414,
 ) -> float:
     """计算 UCT 分数"""
 
-    if child_visit_count == 0:
+    if child_node_visit_count == 0:
         return float('inf')
 
-    exploitation_score = child_score_count / child_visit_count  # 利用分数
+    exploitation_score = child_node_score_count / child_node_visit_count  # 利用分数
     exploration_score = exploration_c * sqrt(
-        log(parent_visit_count) / child_visit_count
+        log(parent_node_visit_count) / child_node_visit_count
     )  # 探索分数
     return exploitation_score + exploration_score
 
 
 def select_best_leaf_node(
-    root_id: str, tree_nodes: dict[str, LATSTreeNode], exploration_c: float = 1.414
+    root_node_id: str, tree_nodes: dict[str, LATSTreeNode], exploration_c: float = 1.414
 ) -> str:
     """选择最佳叶子节点"""
 
-    current_node_id = root_id
+    current_node_id = root_node_id
     while True:
         current_node = tree_nodes[current_node_id]
-        if current_node.is_completed or not current_node.child_ids:
+        if not current_node.child_ids:
             return current_node_id
 
         valid_child_nodes = []
@@ -54,7 +54,7 @@ def select_best_leaf_node(
                 valid_child_nodes.append(child_node)
 
         if not valid_child_nodes:
-            return current_node_id
+            return None
 
         best_leaf_node = None
         best_uct_score = -float('inf')
@@ -176,6 +176,8 @@ def get_nodes_context(state: InferenceGraphState, config: RunnableConfig) -> str
             if node_observation := node.observation:
                 current_nodes_context += f'工具运行情况：{node_observation}\n'
 
+    return current_nodes_context
+
 
 async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
     """扩展器节点"""
@@ -266,7 +268,7 @@ async def executor_node(state: InferenceGraphState, config: RunnableConfig) -> d
         if not isinstance(result, Exception):
             new_nodes[result.id] = result
     parent_node = current_node.model_copy()
-    parent_node.children_ids.extend(list(new_nodes.keys()))
+    parent_node.child_ids.extend(list(new_nodes.keys()))
     new_nodes[current_node_id] = parent_node
     return {'tree_nodes': new_nodes}
 
