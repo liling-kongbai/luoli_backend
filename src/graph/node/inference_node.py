@@ -176,23 +176,14 @@ async def inference_expander_node(
     }
 
 
-async def process_expand_action(
-    config: RunnableConfig,
-    expand_action: ExpandAction,
-    current_node_id: str,
-    current_node_depth: int,
-    current_node_summary: str | None,
+async def execute_expand_action(
+    config: RunnableConfig, expand_action: ExpandAction
 ) -> LATSTreeNode:
-    """处理扩展行动"""
+    """执行扩展行动"""
 
     if tool_name := expand_action.tool_name:
         if tool := config['configurable'].get('tool_manager').get_tool(tool_name):
-            if getattr(tool, 'is_safe', False):
-                logger.warning(
-                    f'<process_expand_action> 工具 {tool_name} 不安全，已模拟运行，运行完成！！！'
-                )
-                observation = f'工具 {tool_name} 不安全，已模拟运行，运行完成！！！'
-            else:
+            if getattr(tool, 'is_safe', True):
                 try:
                     tool_args = expand_action.tool_args or {}
                     result = await tool.tool.ainvoke(tool_args, config)
@@ -202,38 +193,38 @@ async def process_expand_action(
                         else dumps(result, ensure_ascii=False)
                     )
                 except Exception:
-                    logger.error(
-                        f'<process_expand_action> 处理扩展行动报错！！！\n{format_exc()}'
-                    )
-                    observation = f'工具 {tool_name} 执行失败。\n工具参数：{tool_args}\n{format_exc()}'
+                    observation = f'工具 {tool_name} 运行报错！！！\n工具参数：{tool_args}\n{format_exc()}'
+                    logger.error(f'<execute_expand_action> {observation}')
+            else:
+                observation = f'工具 {tool_name} 不安全，已模拟运行，运行完成！！！'
+                logger.warning(f'<execute_expand_action> {observation}')
         else:
-            logger.warning(f'<process_expand_action> 工具 {tool_name} 不存在！！！')
-            observation = f'工具 {tool_name} 不存在！！！'
-    return LATSTreeNode(
-        parent_id=current_node_id,
-        depth=current_node_depth + 1,
-        summary=current_node_summary,
-        action=expand_action,
-        observation=observation,
-    )
+            observation = f'工具 {tool_name} 不存在，无法继续运行！！！'
+            logger.warning(f'<execute_expand_action> {observation}')
+    else:
+        observation = '扩展行动无工具名称，无法继续运行！！！'
+        logger.warning(f'<execute_expand_action> {observation}')
+    return LATSTreeNode(action=expand_action, observation=observation)
 
 
-async def executor_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
-    """执行器节点"""
+async def inference_executor_node(
+    state: InferenceGraphState, config: RunnableConfig
+) -> dict:
+    """推理层执行器节点"""
 
     current_node_id = state.current_node_id
     current_node = state.tree_nodes[current_node_id]
 
+    if not (candidates := state.candidates):
+        return {}
+
     results = await gather(
         *(
-            process_expand_action(
+            execute_expand_action(
                 config,
                 expand_action,
-                current_node_id,
-                current_node.depth,
-                current_node.summary,
             )
-            for expand_action in state.candidates
+            for expand_action in candidates
         ),
         return_exceptions=True,
     )
@@ -242,6 +233,7 @@ async def executor_node(state: InferenceGraphState, config: RunnableConfig) -> d
     for result in results:
         if not isinstance(result, Exception):
             new_nodes[result.id] = result
+
     parent_node = current_node.model_copy()
     parent_node.child_ids.extend(list(new_nodes.keys()))
     new_nodes[current_node_id] = parent_node
