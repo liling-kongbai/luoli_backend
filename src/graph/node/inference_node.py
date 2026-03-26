@@ -152,52 +152,28 @@ async def inference_summarizer_node(
     }
 
 
-def get_current_node_context(state: InferenceGraphState, config: RunnableConfig) -> str:
-    """获取节点上下文"""
+async def inference_expander_node(
+    state: InferenceGraphState, config: RunnableConfig
+) -> dict:
+    """推理层扩展器节点"""
 
-    current_node_id = state.current_node_id
-    tree_nodes = state.tree_nodes
-    current_node = tree_nodes[current_node_id]
+    trajectory = get_nodes_trajectory(state.tree_nodes, state.current_node_id, 5)
+    old_summary = trajectory[0].summary or ''
 
-    current_nodes_context = ''
-
-    recent_depth = current_node.depth % config['configurable'].get('summarise_depth')
-    if current_node_summary := current_node.summary:
-        current_nodes_context += f'前情提要/记忆总结：{current_node_summary}\n'
-
-    if recent_depth != 0 or not current_node_summary:
-        context_nodes_trajectory = get_nodes_trajectory(
-            tree_nodes, current_node_id, recent_depth
-        )
-        for node in context_nodes_trajectory:
-            if node_action := node.action:
-                current_nodes_context += f'内部思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n'
-            if node_observation := node.observation:
-                current_nodes_context += f'工具运行情况：{node_observation}\n'
-
-    return current_nodes_context
-
-
-async def expander_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
-    """扩展器节点"""
-
-    try:
-        chain = ExpandGenerator(config['configurable'].get('llm')).get_extractor_chain()
-        result = await chain.ainvoke(
-            {
-                'user_input_content': state.user_input_content,
-                'current_node_context': get_nodes_context(state, config),
-                'input': '开始生成',
-            },
-            config,
-        )
-        return {
-            'llm_call_count': state.llm_call_count + 1,
-            'candidates': result.candidates or [],
-        }
-    except Exception:
-        logger.error(f'<expander_node> 扩展器节点报错！！！\n{format_exc()}')
-        return {'candidates': []}
+    chain = ExpandGenerator(config['configurable'].get('llm')).get_extractor_chain()
+    result = await chain.ainvoke(
+        {
+            'user_input_content': state.user_input_content,
+            'node_context': f'前情提要/上下文总结：{old_summary}\n'
+            + get_nodes_context(trajectory),
+            'input': '开始生成',
+        },
+        config,
+    )
+    return {
+        'candidates': result.candidates,
+        'llm_call_count': state.llm_call_count + 1,
+    }
 
 
 async def process_expand_action(
