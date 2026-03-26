@@ -25,7 +25,7 @@ async def routine_chat_node(state: RoutineGraphState, config: RunnableConfig) ->
         },
         config,
     )
-    return {'messages': [response], 'introspect_reson': None}
+    return {'messages': [response], 'introspect_reason': None}
 
 
 async def routine_tools_call_node(
