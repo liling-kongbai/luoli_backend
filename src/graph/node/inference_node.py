@@ -95,20 +95,20 @@ def inference_selector_node(state: InferenceGraphState, config: RunnableConfig) 
         return {'current_node_id': SelectionClassification.Finalize.value}
 
 
-def get_context_nodes_trajectory(
-    tree_nodes: dict[str, LATSTreeNode], leaf_node_id: str, context_depth: int
+def get_nodes_trajectory(
+    tree_nodes: dict[str, LATSTreeNode], leaf_node_id: str, trajectory_depth: int
 ) -> list[LATSTreeNode]:
-    """获取上下文节点轨迹"""
+    """获取节点轨迹"""
 
-    current_context_depth = 0
-    context_nodes_trajectory = []
+    current_trajectory_depth = 0
+    nodes_trajectory = []
     current_node_id = leaf_node_id
-    while current_node_id and current_context_depth <= context_depth:
+    while current_node_id and current_trajectory_depth <= trajectory_depth:
         current_node = tree_nodes[current_node_id]
-        context_nodes_trajectory.append(current_node)
+        nodes_trajectory.append(current_node)
         current_node_id = current_node.parent_id
-        current_context_depth += 1
-    return context_nodes_trajectory[::-1]
+        current_trajectory_depth += 1
+    return nodes_trajectory[::-1]
 
 
 async def summariser_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
