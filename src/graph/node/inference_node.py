@@ -3,11 +3,8 @@ from json import dumps
 from logging import getLogger
 from math import log, sqrt
 from traceback import format_exc
-from typing import Any
 
 from langchain_core.runnables.config import RunnableConfig
-
-from graph.type.type import LATSTreeNode
 
 from ..extractor import (
     EvaluateGenerator,
@@ -379,37 +376,34 @@ def inference_backpropagator_node(
     return {'tree_nodes': new_tree_nodes, 'iterate_count': state.iterate_count + 1}
 
 
-async def finaliser_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
-    """最终器节点"""
+async def inference_final_node(
+    state: InferenceGraphState, config: RunnableConfig
+) -> dict:
+    """推理层最终节点"""
 
     tree_nodes = state.tree_nodes
 
-    best_node = None
+    final_node = None
     completed_nodes = [node for node in tree_nodes.values() if node.is_completed]
     if completed_nodes:
-        base_node = max(completed_nodes, key=lambda node: node.score_count)
-    if not best_node:
-        return
+        final_node = max(completed_nodes, key=lambda node: node.score_count)
+    if not final_node:
+        return {}
 
-    trajectory = get_context_nodes_trajectory(tree_nodes, base_node.id, base_node.depth)
-    trajectory_summary = ''
-    for i, node in enumerate(trajectory):
-        if not node.action:
-            continue
-        trajectory_summary += f'步骤{i + 1}：内部思考：{node.action.thought}\n需要调用的工具：{node.action.tool_name}\n需要调用的工具的参数：{node.action.tool_args}\n工具运行情况：{node.observation}\n'
+    final_trajectory_content = ''
+    for i, node in enumerate[LATSTreeNode](
+        get_nodes_trajectory(tree_nodes, final_node.id, final_node.depth)
+    ):
+        node_action = node.action
+        final_trajectory_content += f'步骤{i + 1}：思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n工具运行的观察{node.observation}\n'
 
-    try:
-        chain = FinalPlanGenerator(
-            config['configurable'].get('llm')
-        ).get_extractor_chain()
-        result = await chain.ainvoke(
-            {
-                'user_input_content': state.user_input_content,
-                'trajectory': trajectory_summary,
-                'input': '开始生成执行计划',
-            },
-            config,
-        )
-        return {'final_plan': result}
-    except Exception:
-        logger.error(f'<finaliser_node> 最终器节点报错！！！\n{format_exc()}')
+    chain = FinalPlanGenerator(config['configurable'].get('llm')).get_extractor_chain()
+    result = await chain.ainvoke(
+        {
+            'user_input_content': state.user_input_content,
+            'final_trajectory_content': final_trajectory_content,
+            'input': '开始生成',
+        },
+        config,
+    )
+    return {'final_plan': result}
