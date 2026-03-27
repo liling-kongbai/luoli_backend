@@ -214,28 +214,31 @@ async def inference_executor_node(
 
     current_node_id = state.current_node_id
     current_node = state.tree_nodes[current_node_id]
-
     if not (candidates := state.candidates):
         return {}
 
     results = await gather(
-        *(
-            execute_expand_action(
-                config,
-                expand_action,
-            )
-            for expand_action in candidates
-        ),
+        *(execute_expand_action(config, expand_action) for expand_action in candidates),
         return_exceptions=True,
     )
 
     new_nodes = {}
     for result in results:
-        if not isinstance(result, Exception):
-            new_nodes[result.id] = result
+        if isinstance(result, Exception):
+            error_node = LATSTreeNode(
+                parent_id=current_node_id,
+                depth=current_node.depth + 1,
+                is_pruned=True,
+                pruned_reason='运行扩展行动时报错，无法继续运行！！！',
+            )
+            new_nodes[error_node.id] = error_node
+        result.parent_id = current_node_id
+        result.depth = current_node.depth + 1
+        result.summary = current_node.summary
+        new_nodes[result.id] = result
 
     parent_node = current_node.model_copy()
-    parent_node.child_ids.extend(list(new_nodes.keys()))
+    parent_node.child_ids.extend(list[str](new_nodes.keys()))
     new_nodes[current_node_id] = parent_node
     return {'tree_nodes': new_nodes}
 
