@@ -23,11 +23,7 @@ async def intent_classifier_node(state: MainGraphState, config: RunnableConfig) 
             config['configurable'].get('llm')
         ).get_extractor_chain()
         result = await chain.ainvoke(
-            {
-                'messages': state.messages[-10:],
-                'input': '开始分类',
-            },
-            config,
+            {'messages': state.messages[-10:], 'input': '开始分类'}, config
         )
         return {'intent': result.intent.value}
     except Exception:
