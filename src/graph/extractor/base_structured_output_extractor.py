@@ -49,10 +49,7 @@ class BaseStructuredOutputExtractor(ABC):
         """获取提取器链"""
 
         chat_prompt = ChatPromptTemplate.from_messages(
-            [
-                ('system', dedent(self.SYSTEM_PROMPT)),
-                ('human', '{input}'),
-            ]
+            [('system', dedent(self.SYSTEM_PROMPT)), ('human', '{input}')]
         )
         if partial_variables := self._get_partial_variables():
             chat_prompt = chat_prompt.partial(**partial_variables)
