@@ -3,8 +3,11 @@ from json import dumps
 from logging import getLogger
 from math import log, sqrt
 from traceback import format_exc
+from typing import Any
 
 from langchain_core.runnables.config import RunnableConfig
+
+from graph.type.type import LATSTreeNode
 
 from ..extractor import (
     EvaluateGenerator,
@@ -277,11 +280,10 @@ async def inference_evaluator_node(
     """推理层评估器节点"""
 
     tree_nodes = state.tree_nodes
-    parent_node = tree_nodes[state.current_node_id]
 
     nodes_to_evaluate = []
-    for child_id in parent_node.child_ids:
-        if child_node := state.tree_nodes.get(child_id):
+    for child_id in tree_nodes[state.current_node_id].child_ids:
+        if child_node := tree_nodes.get(child_id):
             if not child_node.is_pruned and child_node.visit_count == 0:
                 nodes_to_evaluate.append(child_node)
 
@@ -289,16 +291,26 @@ async def inference_evaluator_node(
         return {}
 
     results = await gather(
-        *(evaluate_leaf_node(tree_nodes, config, node) for node in nodes_to_evaluate),
+        *(
+            evaluate_leaf_node(config, state.user_input_content, tree_nodes, node)
+            for node in nodes_to_evaluate
+        ),
         return_exceptions=True,
     )
 
     new_nodes = {}
-
+    for node, result in zip(nodes_to_evaluate, results):
+        if isinstance(result, Exception):
+            new_node = node.model_copy()
+            new_node.visit_count += 1
+            new_node.score_count = 0
+            new_node.is_pruned = True
+            new_node.pruned_reason = '评估叶子节点时报错，无法继续运行！！！'
+            new_nodes[new_node.id] = new_node
+        else:
+            new_nodes[result.id] = result
     return {
-        'tree_nodes': {
-            node.id: node for node in results if not isinstance(node, Exception)
-        },
+        'tree_nodes': new_nodes,
         'llm_call_count': state.llm_call_count + len(nodes_to_evaluate),
     }
 
