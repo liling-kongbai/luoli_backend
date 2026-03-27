@@ -244,65 +244,57 @@ async def inference_executor_node(
 
 
 async def evaluate_leaf_node(
-    state: InferenceGraphState, config: RunnableConfig, leaf_node: LATSTreeNode
+    config: RunnableConfig,
+    user_input_content: str,
+    tree_nodes: dict[str, LATSTreeNode],
+    leaf_node: LATSTreeNode,
 ) -> LATSTreeNode:
     """评估叶子节点"""
 
-    current_nodes_context = ''
-    context_nodes_trajectory = get_context_nodes_trajectory(
-        state.tree_nodes, leaf_node.id, leaf_node.depth
+    chain = EvaluateGenerator(config['configurable'].get('llm')).get_extractor_chain()
+    result = await chain.ainvoke(
+        {
+            'user_input_content': user_input_content,
+            'current_node_context': get_nodes_context(
+                get_nodes_trajectory(tree_nodes, leaf_node.id, leaf_node.depth)
+            ),
+            'input': '开始评估',
+        },
+        config,
     )
-    for node in context_nodes_trajectory:
-        if node_action := node.action:
-            current_nodes_context += f'内部思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n'
-        if node_observation := node.observation:
-            current_nodes_context += f'工具运行情况：{node_observation}\n'
-
-    try:
-        chain = EvaluateGenerator(
-            config['configurable'].get('llm')
-        ).get_extractor_chain()
-        result = await chain.ainvoke(
-            {
-                'user_input_content': state.user_input_content,
-                'current_node_context': current_nodes_context,
-                'input': '开始评估',
-            },
-            config,
-        )
-        new_node = leaf_node.model_copy()
-        if result.is_pruned or result.score == 0:
-            new_node.is_pruned = True
-            new_node.pruned_reason = result.analysis
-        new_node.score_count = result.score
-        new_node.is_completed = result.is_completed
-        return new_node
-    except Exception:
-        logger.error(f'<evaluate_leaf_node> 评估叶子节点报错！！！\n{format_exc()}')
-        new_node = leaf_node.model_copy()
+    new_node = leaf_node.model_copy()
+    if result.score == 0 or result.is_pruned:
         new_node.is_pruned = True
-        new_node.pruned_reason = f'评估叶子节点报错！！！\n{format_exc()}'
-        return new_node
+        new_node.pruned_reason = result.analysis
+    new_node.score_count = result.score
+    new_node.is_completed = result.is_completed
+    return new_node
 
 
-async def evaluator_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
-    """评估器节点"""
+async def inference_evaluator_node(
+    state: InferenceGraphState, config: RunnableConfig
+) -> dict:
+    """推理层评估器节点"""
 
-    parent_node = state.tree_nodes[state.current_node_id]
+    tree_nodes = state.tree_nodes
+    parent_node = tree_nodes[state.current_node_id]
 
     nodes_to_evaluate = []
     for child_id in parent_node.child_ids:
-        child_node = state.tree_nodes[child_id]
-        if child_node and child_node.visit_count == 0:
-            nodes_to_evaluate.append(child_node)
+        if child_node := state.tree_nodes.get(child_id):
+            if not child_node.is_pruned and child_node.visit_count == 0:
+                nodes_to_evaluate.append(child_node)
 
     if not nodes_to_evaluate:
         return {}
 
     results = await gather(
-        *(evaluate_leaf_node(state, config, node) for node in nodes_to_evaluate),
+        *(evaluate_leaf_node(tree_nodes, config, node) for node in nodes_to_evaluate),
         return_exceptions=True,
     )
+
+    new_nodes = {}
+
     return {
         'tree_nodes': {
             node.id: node for node in results if not isinstance(node, Exception)
