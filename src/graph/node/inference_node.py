@@ -316,7 +316,7 @@ async def inference_evaluator_node(
 
 
 def backpropagate(
-    tree_nodes: dict[str, LATSTreeNode], node_id: str, node_score: float
+    tree_nodes: dict[str, LATSTreeNode], node_id: str, node_score_count: float
 ) -> dict[str, LATSTreeNode]:
     """反向传播"""
 
@@ -324,13 +324,12 @@ def backpropagate(
     current_node_id = node_id
 
     while current_node_id:
-        current_node = tree_nodes.get(current_node_id)
-        if not current_node:
+        if not (current_node := tree_nodes.get(current_node_id)):
             break
 
         new_node = current_node.model_copy()
         new_node.visit_count += 1
-        new_node.score_count += node_score
+        new_node.score_count += node_score_count
 
         if new_node.child_ids:
             is_pruned = True
@@ -343,39 +342,41 @@ def backpropagate(
 
             if is_pruned and not new_node.is_pruned:
                 new_node.is_pruned = True
-                if not new_node.pruned_reason:
-                    new_node.pruned_reason = '反向传播过程中，发现子节点被剪枝！！！'
+                new_node.pruned_reason + '反向传播过程中，发现子节点被剪枝！！！'
 
         updates[new_node.id] = new_node
-        current_node_id = new_node.parent_id
+        current_node_id = new_node.get('parent_id')
     return updates
 
 
-def backpropagator_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
-    """反向传播器节点"""
+def inference_backpropagator_node(
+    state: InferenceGraphState, config: RunnableConfig
+) -> dict:
+    """推理层反向传播器节点"""
 
     tree_nodes = state.tree_nodes
-    parent_node = tree_nodes[state.current_node_id]
 
     valid_child_nodes = []
-    for child_id in parent_node.child_ids:
-        child_node = tree_nodes[child_id]
-        if child_node and child_node.visit_count == 0:
-            valid_child_nodes.append(child_node)
+    for child_id in tree_nodes[state.current_node_id].child_ids:
+        if child_node := tree_nodes.get(child_id):
+            if child_node.visit_count == 0:
+                valid_child_nodes.append(child_node)
 
     if not valid_child_nodes:
         return {'iterate_count': state.iterate_count + 1}
 
-    new_updates = {}
+    new_tree_nodes = tree_nodes.copy()
+    updates = {}
     for valid_child_node in valid_child_nodes:
-        new_updates.update(
+        updates.update(
             backpropagate(
-                tree_nodes=tree_nodes.copy(),
+                tree_nodes=new_tree_nodes,
                 node_id=valid_child_node.id,
-                node_score=valid_child_node.score_count,
+                node_score_count=valid_child_node.score_count,
             )
         )
-    return {'tree_nodes': new_updates, 'iterate_count': state.iterate_count + 1}
+        new_tree_nodes.update(updates)
+    return {'tree_nodes': new_tree_nodes, 'iterate_count': state.iterate_count + 1}
 
 
 async def finaliser_node(state: InferenceGraphState, config: RunnableConfig) -> dict:
