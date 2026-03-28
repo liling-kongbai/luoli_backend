@@ -109,24 +109,9 @@ def selector_condition(state: InferenceGraphState, config: RunnableConfig) -> st
     return SelectionClassification.Expand.value
 
 
-def route_from_backprop(state, config: RunnableConfig) -> str:
-    tree_nodes = state.tree_nodes
+def backpropagator_condition(state: InferenceGraphState) -> str:
+    """反向传播器条件"""
 
-    # 1. 检查“提前终止”信号 (Early Stopping)
-    # 只要整棵树里出现了任何一个 is_completed=True 的节点，立刻收工！
-    for node in tree_nodes.values():
-        if getattr(node, 'is_completed', False):
-            return 'finaliser_node'
-
-    # 2. 检查“全军覆没”信号
-    # 如果根节点的所有子分支都被标记为 is_pruned，也没必要再搜了
-    root = tree_nodes.get(state.root_id)
-    if root and root.child_ids:
-        all_root_children_dead = all(
-            tree_nodes[cid].is_pruned for cid in root.child_ids
-        )
-        if all_root_children_dead:
-            return 'finaliser_node'
-
-    # 3. 继续循环：回到 Selector 开始下一轮 UCT 选择
-    return 'selector_node'
+    if any(getattr(node, 'is_completed', False) for node in state.tree_nodes.values()):
+        return BackpropagationClassification.Finalize.value
+    return BackpropagationClassification.Select.value
