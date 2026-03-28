@@ -47,7 +47,7 @@ async def introspect_classifier_node(
     introspect_count = state.introspect_count
     if introspect_count >= 3:
         logger.warning(
-            '<introspect_classifier_node> 反思次数超过 3 次，直接返回最终响应层！！！'
+            '<introspect_classifier_node> 反思次数超过 3 次，直接返回最终！！！'
         )
         return {'introspection': IntrospectionClassification.Finalize.value}
 
@@ -58,30 +58,21 @@ async def introspect_classifier_node(
         result = await chain.ainvoke(
             {
                 'messages': state.messages,
-                'response_draft': state.response_draft.content
-                if state.response_draft
-                else '暂时没有响应草稿',
+                'response_draft': state.response_draft_content,
                 'input': f'本次用户的消息/问题：{state.user_input_content}',
             },
             config,
         )
-
-        if (
-            result.introspection.value
-            == IntrospectionClassification.FinalChatLayer.value
-        ):
-            return {'introspection': result.introspection.value}
-        else:
-            return {
-                'introspect_count': introspect_count + 1,
-                'introspection': result.introspection.value,
-                'introspect_reason': result.reason,
-            }
+        return {
+            'introspect_count': introspect_count + 1,
+            'introspection': result.introspection.value,
+            'introspect_reason': result.reason,
+        }
     except Exception:
         logger.error(
             f'<introspect_classifier_node> 反思分类器节点报错！！！\n{format_exc()}'
         )
-        return {'introspection': IntrospectionClassification.FinalChatLayer.value}
+        return {'introspection': IntrospectionClassification.Finalize.value}
 
 
 def introspect_classifier_condition(state: RoutineGraphState) -> str:
