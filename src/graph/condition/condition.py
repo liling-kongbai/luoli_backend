@@ -81,38 +81,32 @@ def introspect_classifier_condition(state: RoutineGraphState) -> str:
     return state.introspection
 
 
-def inference_selector_condition(state: InferenceGraphState) -> str:
-    """推理选择器条件"""
-
-    pass
-
-
-def route_from_selector(state: InferenceGraphState, config: RunnableConfig) -> str:
+def selector_condition(state: InferenceGraphState, config: RunnableConfig) -> str:
+    """选择器条件"""
 
     current_node_id = state.current_node_id
-
-    # 1. 熔断/结算：如果 Selector 返回 None (说明达到迭代上限)
-    # 或者所有叶子节点都被剪枝了（无路可走）
     if not current_node_id or current_node_id == SelectionClassification.Finalize.value:
-        return 'finalize_node'
+        logger.warning(
+            '<selector_condition> 当前节点 ID 不存在或为最终，直接返回最终！！！'
+        )
+        return SelectionClassification.Finalize.value
 
-    tree_nodes = state.tree_nodes
-    current_node = tree_nodes[current_node_id]
+    current_node = state.tree_nodes[current_node_id]
+    if current_node_id == state.root_node_id:
+        if state.iterate_count > 0 and not current_node.child_ids:
+            logger.warning(
+                '<selector_condition> 迭代计数大于 0 且根节点没有子节点，直接返回最终！！！'
+            )
+            return SelectionClassification.Finalize.value
 
-    # 2. 判定是否触发“逢五抽一”总结
-    summarize_depth = config['configurable'].get('summarize_depth', 5)
-
-    # 条件：深度是 5 的倍数，且该节点目前还没有摘要
-    # 注意：depth=0 是根节点，通常不需要总结
-    if (
-        current_node.depth > 0
-        and current_node.depth % summarize_depth == 0
-        and not getattr(current_node, 'summary', None)
-    ):
-        return 'summary_node'
-
-    # 3. 正常情况：前往扩展节点
-    return 'expander_node'
+    current_node_depth = current_node.depth
+    if current_node_depth > 0:
+        if (
+            current_node_depth % config['configurable'].get('summarize_depth', 5) == 0
+            and current_node_depth > current_node.summary_generate_depth
+        ):
+            return SelectionClassification.Summarize.value
+    return SelectionClassification.Expand.value
 
 
 def route_from_backprop(state, config: RunnableConfig) -> str:
