@@ -16,6 +16,9 @@ class MainGraphState(BaseModel):
     # 意图相关
     intent: str | None = Field(default=None)
 
+    # 最终执行计划
+    final_execute_plan: FinalExecutePlan | None = Field(default=None)
+
 
 class RoutineGraphState(BaseModel):
     """常规层图状态"""
