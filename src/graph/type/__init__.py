@@ -1,16 +1,14 @@
 from .type import (
-    Backpropagation,
     BackpropagationClassification,
     EvaluateResult,
     ExpandAction,
     ExpandResult,
-    FinalExecutionPlan,
+    FinalExecutePlan,
     Intent,
     IntentClassification,
     Introspection,
     IntrospectionClassification,
     LATSTreeNode,
-    Selection,
     SelectionClassification,
-    SummariseResult,
+    SummarizeResult,
 )
