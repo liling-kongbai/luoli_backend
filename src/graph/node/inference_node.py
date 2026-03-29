@@ -9,7 +9,7 @@ from langchain_core.runnables.config import RunnableConfig
 from ..extractor import (
     EvaluateGenerator,
     ExpandGenerator,
-    FinalPlanGenerator,
+    FinalExecutePlanGenerator,
     SummarizeGenerator,
 )
 from ..state import InferenceGraphState
@@ -146,6 +146,7 @@ async def inference_summarizer_node(
     )
     updated_node = current_node.model_copy()
     updated_node.summary = result.summary
+    updated_node.summary_generate_depth = current_node.depth
     return {
         'tree_nodes': {current_node_id: updated_node},
         'llm_call_count': state.llm_call_count + 1,
@@ -255,7 +256,7 @@ async def evaluate_leaf_node(
     result = await chain.ainvoke(
         {
             'user_input_content': user_input_content,
-            'current_node_context': get_nodes_context(
+            'nodes_context': get_nodes_context(
                 get_nodes_trajectory(tree_nodes, leaf_node.id, leaf_node.depth)
             ),
             'input': '开始评估',
@@ -397,7 +398,9 @@ async def inference_final_node(
         node_action = node.action
         final_trajectory_content += f'步骤{i + 1}：思考：{node_action.thought}\n需要调用的工具：{node_action.tool_name}\n需要调用的工具的参数：{node_action.tool_args}\n工具运行的观察{node.observation}\n'
 
-    chain = FinalPlanGenerator(config['configurable'].get('llm')).get_extractor_chain()
+    chain = FinalExecutePlanGenerator(
+        config['configurable'].get('llm')
+    ).get_extractor_chain()
     result = await chain.ainvoke(
         {
             'user_input_content': state.user_input_content,
@@ -406,4 +409,4 @@ async def inference_final_node(
         },
         config,
     )
-    return {'final_plan': result}
+    return {'final_execute_plan': result}
