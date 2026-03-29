@@ -16,7 +16,7 @@ class ExpandGenerator(BaseStructuredOutputExtractor):
 
         **当前处理过程的上下文摘要：**
         <<<
-        {current_node_context}
+        {nodes_context}
         >>>
 
         **任务要求：**
@@ -32,7 +32,7 @@ class ExpandGenerator(BaseStructuredOutputExtractor):
 
         **注意事项：**
         - 如果你认为根据当前信息，任务已经 **彻底完成**，请返回 **空列表**。
-        - 如果当前已经进入死胡同或判断任务已无法完成，无法继续，也返回 **空列表**。
+        - 如果当前已经进入死胡同或判断任务已无法完成，无法继续，无继续意义，也返回 **空列表**。
         - 每次只规划 **接下来的一步行动**，不要生成多步计划。
         - 并不是需要每次都生成 2 个或 3 个，你需要自行判断，本次生成几个？生成的方案使用哪种方案风格？不同的方案风格也可以不同。
 
