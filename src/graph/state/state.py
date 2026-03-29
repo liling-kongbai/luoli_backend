@@ -5,7 +5,7 @@ from langgraph.graph.message import add_messages
 from pydantic import Field
 from pydantic.main import BaseModel
 
-from ..type import LATSTreeNode
+from ..type import ExpandAction, FinalExecutePlan, LATSTreeNode
 
 
 class MainGraphState(BaseModel):
@@ -37,3 +37,23 @@ def merge_tree_nodes(
     """合并树节点"""
 
     return (left or {}) | (right or {})
+
+
+class InferenceGraphState(BaseModel):
+    """推理层图状态"""
+
+    messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=list)
+    user_input_content: str | None = Field(default=None)  # 用户输入内容
+
+    root_node_id: str
+    current_node_id: str | None = Field(default=None)
+    tree_nodes: Annotated[dict[str, LATSTreeNode], merge_tree_nodes] = Field(
+        default_factory=dict
+    )
+
+    iterate_count: int = Field(default=0)
+    llm_call_count: int = Field(default=0)
+
+    candidates: list[ExpandAction] | None = Field(default=None)
+
+    final_execute_plan: FinalExecutePlan | None = Field(default=None)
