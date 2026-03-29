@@ -4,7 +4,7 @@ from traceback import format_exc
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
-from ..state import MainGraphState
+from ..state import InferenceGraphState, MainGraphState, RoutineGraphState
 from ..type import LATSTreeNode
 
 logger = getLogger(__name__)
@@ -21,16 +21,18 @@ async def routine_graph_adapter_node(
         for step in final_execute_plan.steps:
             user_input_content += f'步骤 {step.id} ：\n思考：{step.thought}\n需要调用的工具的名称：{step.tool_name}\n需要调用的工具的参数：{step.tool_args}\n工具的运行结果：{step.result}\n此步骤是否完成：{step.status.value}\n'
 
-    routine_graph_state = {
-        'messages': state.messages,
-        'user_input_content': user_input_content
-        if user_input_content
-        else state.messages[-1].content,
-        'response_draft_content': None,
-        'introspect_count': 0,
-        'introspection': None,
-        'introspect_reason': None,
-    }
+    routine_graph_state = RoutineGraphState(
+        {
+            'messages': state.messages,
+            'user_input_content': user_input_content
+            if user_input_content
+            else state.messages[-1].content,
+            'response_draft_content': None,
+            'introspect_count': 0,
+            'introspection': None,
+            'introspect_reason': None,
+        }
+    )
 
     try:
         response = await routine_graph.ainvoke(routine_graph_state, config)
@@ -62,17 +64,19 @@ async def inference_graph_adapter_node(
         pruned_reason=None,
     )
     root_node_id = root_node.id
-    inference_graph_state = {
-        'messages': state.messages,
-        'user_input_content': state.messages[-1].content,
-        'root_node_id': root_node_id,
-        'current_node_id': root_node_id,
-        'tree_nodes': {root_node_id: root_node},
-        'iterate_count': 0,
-        'llm_call_count': 0,
-        'candidates': None,
-        'final_execute_plan': None,
-    }
+    inference_graph_state = InferenceGraphState(
+        {
+            'messages': state.messages,
+            'user_input_content': state.messages[-1].content,
+            'root_node_id': root_node_id,
+            'current_node_id': root_node_id,
+            'tree_nodes': {root_node_id: root_node},
+            'iterate_count': 0,
+            'llm_call_count': 0,
+            'candidates': None,
+            'final_execute_plan': None,
+        }
+    )
 
     try:
         response = await inference_graph.ainvoke(inference_graph_state, config)
